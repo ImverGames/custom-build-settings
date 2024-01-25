@@ -1,0 +1,17 @@
+{
+    "name": "com.imvergames.custombuildsettings.editor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:7377ff24c23896e438c65266255602e8",
+        "GUID:776454a46de19cb498e4425eba62561b"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
