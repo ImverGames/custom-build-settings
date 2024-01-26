@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace ImverGames.BuildIncrementor
+namespace ImverGames.CustomBuildSettings.Data
 {
     public class BuildValue<T>
     {

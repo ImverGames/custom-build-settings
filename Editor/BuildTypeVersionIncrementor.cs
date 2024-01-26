@@ -1,8 +1,9 @@
 ﻿using System.Collections.Generic;
+using ImverGames.CustomBuildSettings.Data;
 using UnityEditor;
 using UnityEngine;
 
-namespace ImverGames.BuildIncrementor
+namespace ImverGames.CustomBuildSettings.Editor
 {
     public static class BuildTypeVersionIncrementor
     {
