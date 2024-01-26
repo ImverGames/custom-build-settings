@@ -1,4 +1,6 @@
-﻿using System;
+﻿using ImverGames.CustomBuildSettings.Data;
+using ImverGames.CustomBuildSettings.Invoker;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEditor;
@@ -8,11 +10,10 @@ using UnityEditorInternal;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
-namespace ImverGames.BuildIncrementor
+namespace ImverGames.CustomBuildSettings.Editor
 {
     public class CustomBuildSettingsWindow : EditorWindow
     {
-        private CustomBuildPreferencesWindow customBuildPreferencesWindow;
         private BuildIncrementorData buildIncrementorData;
         private List<IBuildPluginEditor> editorPlugins;
         
@@ -33,7 +34,6 @@ namespace ImverGames.BuildIncrementor
 
         private void OnEnable()
         {
-            customBuildPreferencesWindow = ScriptableObject.CreateInstance<CustomBuildPreferencesWindow>();
             buildIncrementorData = new BuildIncrementorData();
             editorPlugins = InterfaceImplementationsInvoker.FindAllPluginsEditor<IBuildPluginEditor>();
             
@@ -49,21 +49,26 @@ namespace ImverGames.BuildIncrementor
             buildIncrementorData.Version.OnValueChanged += OnChangeVersion;
             buildIncrementorData.VersionFormat.OnValueChanged += OnChangeVersionFormat;
 
-            customBuildPreferencesWindow.Initialize();
-
             EnablePlugins();
         }
 
         private void OnFocus()
         {
             BuildTypeVersionIncrementor.LoadOrSaveVersionFromFile(out var buildData);
-            buildIncrementorData.Version.Value = buildData.Version;
-            buildIncrementorData.VersionFormat.Value = GetFormatTypeFromString(buildIncrementorData.Version.Value);
-            buildIncrementorData.SelectedBuildType.Value = buildData.BuildType;
-            
-            foreach (var editorPlugin in editorPlugins)
-                InterfaceImplementationsInvoker.InvokeMethodOnAllImplementations<IBuildPluginEditor>(editorPlugin,
-                    "InvokeOnFocusPlugin", null);
+
+            if (buildIncrementorData != null)
+            {
+                buildIncrementorData.Version.Value = buildData.Version;
+                buildIncrementorData.VersionFormat.Value = GetFormatTypeFromString(buildIncrementorData.Version.Value);
+                buildIncrementorData.SelectedBuildType.Value = buildData.BuildType;
+            }
+
+            if (editorPlugins != null)
+            {
+                foreach (var editorPlugin in editorPlugins)
+                    InterfaceImplementationsInvoker.InvokeMethodOnAllImplementations<IBuildPluginEditor>(editorPlugin,
+                        "InvokeOnFocusPlugin", null);
+            }
         }
 
         private void EnablePlugins()
@@ -457,8 +462,6 @@ namespace ImverGames.BuildIncrementor
             buildIncrementorData = null;
             reorderableList = null;
             scenes = null;
-            
-            DestroyImmediate(customBuildPreferencesWindow);
         }
     }
 }

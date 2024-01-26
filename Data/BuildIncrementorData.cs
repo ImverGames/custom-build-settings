@@ -1,4 +1,4 @@
-﻿namespace ImverGames.BuildIncrementor
+﻿namespace ImverGames.CustomBuildSettings.Data
 {
     public class BuildIncrementorData
     {

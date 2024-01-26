@@ -1,7 +1,25 @@
 {
   "name": "com.imvergames.custombuildsettings",
-  "version": "0.4.1",
+  "version": "0.4.5",
   "displayName": "Custom Build Settings",
   "description": "This package contains a set of tools for customization and facilitating the application building process.",
-  "unity": "2019.1"
+  "unity": "2019.1",
+
+  "samples": [
+    {
+      "displayName": "Android settings plugin",
+      "description": "Plugin for rendering settings specific to building Android applications",
+      "path": "Samples~/AndroidSettingsPlugin"
+    },
+    {
+      "displayName": "Cheats plugin",
+      "description": "A plugin that adds asm def with which you can activate various cheats inside the application logic",
+      "path": "Samples~/CheatsPlugin"
+    },
+    {
+      "displayName": "SRDebug plugin",
+      "description": "Plugin for managing SRDebugger settings from a custom build settings window",
+      "path": "Samples~/SRDebugPlugin"
+    }
+  ]
 }

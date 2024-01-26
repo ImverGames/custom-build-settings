@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace ImverGames.BuildIncrementor
+namespace ImverGames.CustomBuildSettings.Invoker
 {
     public class InterfaceImplementationsInvoker
     {
