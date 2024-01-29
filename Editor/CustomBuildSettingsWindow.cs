@@ -1,8 +1,8 @@
-﻿using ImverGames.CustomBuildSettings.Data;
-using ImverGames.CustomBuildSettings.Invoker;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using ImverGames.CustomBuildSettings.Data;
+using ImverGames.CustomBuildSettings.Invoker;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
 using UnityEditor.SceneManagement;
@@ -15,6 +15,8 @@ namespace ImverGames.CustomBuildSettings.Editor
     public class CustomBuildSettingsWindow : EditorWindow
     {
         private BuildIncrementorData buildIncrementorData;
+        private CustomBuildReport customBuildReport;
+        private CustomBuildReportsWindow customBuildReportsWindow;
         private List<IBuildPluginEditor> editorPlugins;
         
         private Vector2 pageScrollPosition;
@@ -35,7 +37,10 @@ namespace ImverGames.CustomBuildSettings.Editor
         private void OnEnable()
         {
             buildIncrementorData = new BuildIncrementorData();
+            customBuildReport = new CustomBuildReport();
+            customBuildReportsWindow = new CustomBuildReportsWindow();
             editorPlugins = InterfaceImplementationsInvoker.FindAllPluginsEditor<IBuildPluginEditor>();
+            editorPlugins = InterfaceImplementationsInvoker.GetOrderedPlugins<IBuildPluginEditor>(editorPlugins);
             
             LoadScenes();
             SetupReorderableList();
@@ -50,6 +55,8 @@ namespace ImverGames.CustomBuildSettings.Editor
             buildIncrementorData.VersionFormat.OnValueChanged += OnChangeVersionFormat;
 
             EnablePlugins();
+
+            customBuildReportsWindow.Initialize(customBuildReport);
         }
 
         private void OnFocus()
@@ -68,6 +75,14 @@ namespace ImverGames.CustomBuildSettings.Editor
                 foreach (var editorPlugin in editorPlugins)
                     InterfaceImplementationsInvoker.InvokeMethodOnAllImplementations<IBuildPluginEditor>(editorPlugin,
                         "InvokeOnFocusPlugin", null);
+            }
+            
+            if(customBuildReportsWindow != null)
+                customBuildReportsWindow.Initialize(customBuildReport);
+            else
+            {
+                customBuildReportsWindow = new CustomBuildReportsWindow();
+                customBuildReportsWindow.Initialize(customBuildReport);
             }
         }
 
@@ -262,6 +277,13 @@ namespace ImverGames.CustomBuildSettings.Editor
                 SettingsService.OpenProjectSettings("Project/Player");
             }
 
+            if (!EditorUserBuildSettings.development)
+            {
+                GUILayout.FlexibleSpace();
+                if (GUILayout.Button("Show build reports"))
+                    customBuildReportsWindow.ShowCustomBuildReport();
+            }
+
             GUILayout.FlexibleSpace();
             if (GUILayout.Button("Build Game", GUILayout.ExpandWidth(false)))
             {
@@ -400,6 +422,8 @@ namespace ImverGames.CustomBuildSettings.Editor
             BuildReport report = BuildPipeline.BuildPlayer(buildPlayerOptions);
             BuildSummary summary = report.summary;
 
+            customBuildReportsWindow.SetLastBuildReport(report);
+
             if (summary.result == BuildResult.Succeeded)
             {
                 Debug.Log($"Build succeeded: {summary.totalSize} bytes at path {summary.outputPath}");
@@ -462,6 +486,9 @@ namespace ImverGames.CustomBuildSettings.Editor
             buildIncrementorData = null;
             reorderableList = null;
             scenes = null;
+            
+            if(customBuildReportsWindow != null)
+                DestroyImmediate(customBuildReportsWindow);
         }
     }
 }
