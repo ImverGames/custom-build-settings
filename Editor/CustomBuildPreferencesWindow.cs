@@ -1,6 +1,7 @@
-﻿using UnityEditor;
+﻿using ImverGames.CustomBuildSettings.Data;
+using UnityEditor;
 
-namespace ImverGames.BuildIncrementor
+namespace ImverGames.BuildIncrementor.Editor
 {
     public class CustomBuildPreferencesWindow : EditorWindow
     {

@@ -1,10 +1,12 @@
 ﻿using System;
 using ImverGames.CustomBuildSettings.Data;
+using ImverGames.CustomBuildSettings.Invoker;
 using UnityEditor;
 using UnityEngine;
 
 namespace ImverGames.CustomBuildSettings.AndroidSettings.Editor
 {
+    [PluginOrder(0)]
     public class AndroidSettingsPluginEditor : IBuildPluginEditor
     {
         private BuildIncrementorData buildIncrementorData;

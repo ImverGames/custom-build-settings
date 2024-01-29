@@ -2,7 +2,8 @@
     "name": "ImverGames.CustomBuildSettings.AndroidSettings.Editor",
     "rootNamespace": "",
     "references": [
-        "GUID:7377ff24c23896e438c65266255602e8"
+        "GUID:e5b4ecf1457994c40a2847351819f5c8",
+        "GUID:92facbce110b7ad4b85f2f869f2e340e"
     ],
     "includePlatforms": [
         "Editor"

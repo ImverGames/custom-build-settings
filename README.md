@@ -46,6 +46,42 @@ This class is used for storing and transferring data between the plugin and the 
 
 `BuildValue<T>` is a generic class used for storing values and tracking their changes in the editor.
 
+### `PluginOrderAttribute` Class
+
+To manage the rendering order of plugins, use the `PluginOrderAttribute` attribute:
+This additional section provides information about the `PluginOrderAttribute`, which is crucial for developers who need to manage the order of their plugin rendering in the Unity editor.
+
+```csharp
+[AttributeUsage(AttributeTargets.Class)]
+public class PluginOrderAttribute : Attribute
+{
+    public int Order { get; private set; }
+
+    public PluginOrderAttribute(int order)
+    {
+        Order = order;
+    }
+}
+```
+
+# Additional Features
+
+## Build Reports and Asset Analysis
+
+### Viewing Build Reports
+The tool provides functionality to view build reports, allowing developers to analyze and understand the build process in detail. This feature is essential for gaining insights into the build process and identifying potential areas for optimization.
+
+### Asset Category Sizes
+It includes the capability to examine the sizes of different asset categories. This feature is vital for optimizing performance and resource usage by providing a clear understanding of how different assets contribute to the overall size of the build.
+
+### Asset Ping in Editor
+There is also the functionality to 'ping' assets in the editor. This enhances the ease of locating and managing assets within the Unity editor, making the asset management process more efficient.
+
+### Saving and Analyzing Multiple Build Reports
+- **Multiple Report Storage**: The tool allows for the storage of up to five different build reports with unique names. This feature enables developers to compare and analyze different builds over time.
+- **Optimization Analysis**: Each saved report can be used to analyze asset usage and optimize asset management for each build. This is particularly useful for tracking the impact of changes and improvements across different versions of the application.
+
+
 ## Creating Your Own Plugin
 
 To create your own plugin:

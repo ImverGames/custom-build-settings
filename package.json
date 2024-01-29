@@ -1,6 +1,6 @@
 {
   "name": "com.imvergames.custombuildsettings",
-  "version": "0.4.5",
+  "version": "0.4.6",
   "displayName": "Custom Build Settings",
   "description": "This package contains a set of tools for customization and facilitating the application building process.",
   "unity": "2019.1",
