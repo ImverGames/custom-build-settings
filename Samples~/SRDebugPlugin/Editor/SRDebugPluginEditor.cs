@@ -116,6 +116,16 @@ namespace ImverGames.CustomBuildSettings.SRDebuggerSettings.Editor
                     throw new ArgumentOutOfRangeException(nameof(buildType), buildType, null);
             }
         }
+
+        public void InvokeBeforeBuild()
+        {
+            
+        }
+
+        public void InvokeAfterBuild()
+        {
+            
+        }
         
         public void InvokeDestroyPlugin()
         {
