@@ -396,6 +396,20 @@ namespace ImverGames.CustomBuildSettings.Editor
             EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
         }
 
+        private void InvokePluginBeforeBuild()
+        {
+            foreach (var editorPlugin in editorPlugins)
+                InterfaceImplementationsInvoker.InvokeMethodOnAllImplementations<IBuildPluginEditor>(editorPlugin,
+                    "InvokeBeforeBuild", null);
+        }
+        
+        private void InvokePluginAfterBuild()
+        {
+            foreach (var editorPlugin in editorPlugins)
+                InterfaceImplementationsInvoker.InvokeMethodOnAllImplementations<IBuildPluginEditor>(editorPlugin,
+                    "InvokeAfterBuild", null);
+        }
+
         private void BuildGame()
         {
             string extension = GetExtensionForTarget(EditorUserBuildSettings.activeBuildTarget);
@@ -403,6 +417,8 @@ namespace ImverGames.CustomBuildSettings.Editor
             string path = EditorUtility.SaveFilePanel("Choose Location and Name for Build", "", defaultName, extension);
 
             if (string.IsNullOrEmpty(path)) return;
+
+            InvokePluginBeforeBuild();
             
             IncrementBuildVersion();
 
@@ -427,6 +443,8 @@ namespace ImverGames.CustomBuildSettings.Editor
             if (summary.result == BuildResult.Succeeded)
             {
                 Debug.Log($"Build succeeded: {summary.totalSize} bytes at path {summary.outputPath}");
+
+                InvokePluginAfterBuild();
             }
             else if (summary.result == BuildResult.Failed)
             {
