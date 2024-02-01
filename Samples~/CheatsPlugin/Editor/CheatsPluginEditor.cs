@@ -82,6 +82,16 @@ namespace ImverGames.CustomBuildSettings.Cheats.Editor
                 Debug.Log("Turn Cheats Off");
             }
         }
+
+        public void InvokeBeforeBuild()
+        {
+            
+        }
+
+        public void InvokeAfterBuild()
+        {
+            
+        }
         
         public void InvokeDestroyPlugin()
         {
