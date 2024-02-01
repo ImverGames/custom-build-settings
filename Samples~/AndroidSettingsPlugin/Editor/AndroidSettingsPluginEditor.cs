@@ -145,6 +145,16 @@ namespace ImverGames.CustomBuildSettings.AndroidSettings.Editor
 
             GUILayout.Space(5);
         }
+
+        public void InvokeBeforeBuild()
+        {
+            
+        }
+
+        public void InvokeAfterBuild()
+        {
+            
+        }
         
         public void InvokeDestroyPlugin()
         {
