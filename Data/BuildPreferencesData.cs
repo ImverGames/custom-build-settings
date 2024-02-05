@@ -1,10 +1,9 @@
-﻿namespace ImverGames.CustomBuildSettings.Data
+﻿using System;
+
+namespace ImverGames.CustomBuildSettings.Data
 {
     public class BuildPreferencesData
     {
-        public BuildPreferencesData()
-        {
-            
-        }
+        public GlobalDataStorage GlobalDataStorage;
     }
 }
