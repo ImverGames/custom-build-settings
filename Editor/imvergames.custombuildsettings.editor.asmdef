@@ -2,8 +2,8 @@
     "name": "com.imvergames.custombuildsettings.editor",
     "rootNamespace": "",
     "references": [
-        "GUID:1daf152e49a1444498ae79f1f39f5e7c",
-        "GUID:22ccde0d6e595b14ba31848627323f2d"
+        "GUID:84fea3b6cd9cf20448a41ed04f9437bd",
+        "GUID:96f974132dde0694ea4426f6c87667fa"
     ],
     "includePlatforms": [
         "Editor"

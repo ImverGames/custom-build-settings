@@ -1,6 +1,6 @@
 {
   "name": "com.imvergames.custombuildsettings",
-  "version": "0.4.6",
+  "version": "0.5.2",
   "displayName": "Custom Build Settings",
   "description": "This package contains a set of tools for customization and facilitating the application building process.",
   "unity": "2019.1",
@@ -20,6 +20,11 @@
       "displayName": "SRDebug plugin",
       "description": "Plugin for managing SRDebugger settings from a custom build settings window",
       "path": "Samples~/SRDebugPlugin"
+    },
+    {
+      "displayName": "Git assistant plugin",
+      "description": "Plugin for executing git commands in the editor",
+      "path": "Samples~/GitAssistantPlugin"
     }
   ]
 }

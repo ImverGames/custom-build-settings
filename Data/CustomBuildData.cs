@@ -16,16 +16,17 @@ namespace ImverGames.CustomBuildSettings.Data
 
         public string RegisterOrUpdateVersion(EBuildType buildType, string version, string tag, string meta)
         {
-            try
+            var v = typeVersion.Find(v => v.BuildType == buildType);
+            if (v == null)
             {
-                var v = typeVersion.Find(v => v.BuildType == buildType);
+                v = new BuildTypeVersion(buildType, version, tag, meta);
+                typeVersion.Add(v);
+            }
+            else
+            {
                 v.Version = version;
                 v.VersionTag = tag;
                 v.VersionMeta = meta;
-            }
-            catch
-            {
-                typeVersion.Add(new BuildTypeVersion(buildType, version, tag, meta));
             }
 
             return GetFullBuildVersion(buildType);
@@ -33,72 +34,37 @@ namespace ImverGames.CustomBuildSettings.Data
 
         public string GetBuildVersion(EBuildType buildType)
         {
-            try
-            {
-                return typeVersion.Find(v => v.BuildType == buildType).Version;
-            }
-            catch
-            {
-                return RegisterOrUpdateVersion(buildType, CreateVersionString(new[] { "D1", "D1", "D1" }), string.Empty, string.Empty);
-            }
+            var v = FindVersionByBuildType(buildType);
+            return v != null
+                ? v.Version
+                : RegisterOrUpdateVersion(buildType, CreateVersionString(new[] { "D1", "D1", "D1" }), string.Empty,
+                    string.Empty);
         }
-        
-        public string GetBuildVersionTag(EBuildType buildType)
-        {
-            try
-            {
-                return typeVersion.Find(v => v.BuildType == buildType).VersionTag;
-            }
-            catch
-            {
-                return string.Empty;
-            }
-        }
+    
+        public string GetBuildVersionTag(EBuildType buildType) =>
+            FindVersionByBuildType(buildType)?.VersionTag ?? string.Empty;
 
         public string GetFullBuildVersion(EBuildType buildType)
         {
-            try
-            {
-                var v = typeVersion.Find(v => v.BuildType == buildType);
+            var v = FindVersionByBuildType(buildType);
+            if (v == null) return string.Empty;
 
-                if (string.IsNullOrEmpty(v.VersionTag) && string.IsNullOrEmpty(v.VersionMeta))
-                    return v.Version;
-                else if(string.IsNullOrEmpty(v.VersionMeta))
-                    return $"{v.Version}-{v.VersionTag}";
-                else if (string.IsNullOrEmpty(v.VersionTag))
-                    return $"{v.Version}.{v.VersionMeta}";
-                else
-                    return $"{v.Version}-{v.VersionTag}.{v.VersionMeta}";
-            }
-            catch
-            {
-                return string.Empty;
-            }
+            return string.IsNullOrEmpty(v.VersionTag) && string.IsNullOrEmpty(v.VersionMeta) ? v.Version :
+                string.IsNullOrEmpty(v.VersionMeta) ? $"{v.Version}-{v.VersionTag}" :
+                string.IsNullOrEmpty(v.VersionTag) ? $"{v.Version}.{v.VersionMeta}" :
+                $"{v.Version}-{v.VersionTag}.{v.VersionMeta}";
         }
 
-        public string GetBuildVersionMeta(EBuildType buildType)
-        {
-            try
-            {
-                return typeVersion.Find(v => v.BuildType == buildType).VersionMeta;
-            }
-            catch
-            {
-                return string.Empty;
-            }
-        }
-        
+        public string GetBuildVersionMeta(EBuildType buildType) =>
+            FindVersionByBuildType(buildType)?.VersionMeta ?? string.Empty;
+    
+        private BuildTypeVersion FindVersionByBuildType(EBuildType buildType) =>
+            typeVersion.Find(v => v.BuildType == buildType);
+
         private string CreateVersionString(IReadOnlyList<string> formatParts)
         {
-            int num1 = 0;
-            int num2 = 0;
-            int num3 = 0;
-
-            string formattedNum1 = num1.ToString(formatParts[0]);
-            string formattedNum2 = num2.ToString(formatParts[1]);
-            string formattedNum3 = num3.ToString(formatParts[2]);
-
-            return $"{formattedNum1}.{formattedNum2}.{formattedNum3}";
+            int num1 = 0, num2 = 0, num3 = 0;
+            return $"{num1.ToString(formatParts[0])}.{num2.ToString(formatParts[1])}.{num3.ToString(formatParts[2])}";
         }
     }
 

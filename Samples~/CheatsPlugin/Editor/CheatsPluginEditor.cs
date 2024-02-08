@@ -1,20 +1,20 @@
 ﻿using ImverGames.CustomBuildSettings.Data;
+using ImverGames.CustomBuildSettings.Invoker;
 using UnityEditor;
 using UnityEngine;
 
 namespace ImverGames.CustomBuildSettings.Cheats.Editor
 {
+    [PluginOrder(3, "Cheats/CheatsPlugin")]
     public class CheatsPluginEditor : IBuildPluginEditor
     {
-        private BuildIncrementorData buildIncrementorData;
-        
-        private bool foldout = true;
+        private BuildDataProvider buildDataProvider;
         
         private BuildValue<bool> useCheats;
 
-        public void InvokeSetupPlugin(BuildIncrementorData buildIncrementorData)
+        public void InvokeSetupPlugin(BuildDataProvider buildDataProvider)
         {
-            this.buildIncrementorData = buildIncrementorData;
+            this.buildDataProvider = buildDataProvider;
 
             useCheats = new BuildValue<bool>();
 
@@ -35,31 +35,20 @@ namespace ImverGames.CustomBuildSettings.Cheats.Editor
 
         public void InvokeGUIPlugin()
         {
-            GUILayout.BeginVertical(EditorStyles.helpBox);
-            foldout = EditorGUILayout.BeginFoldoutHeaderGroup(foldout, "Cheats");
-
-            if (foldout)
-            {
-                GUILayout.Space(5);
+            GUILayout.Space(5);
                 
-                string label = useCheats.Value ? "DisableCheats" : "EnableCheats";
-                useCheats.Value = GUILayout.Toggle(useCheats.Value, label);
+            string label = useCheats.Value ? "DisableCheats" : "EnableCheats";
+            useCheats.Value = GUILayout.Toggle(useCheats.Value, label);
                 
-                GUILayout.Space(10);
+            GUILayout.Space(10);
 
-                PlayerSettings.GetScriptingDefineSymbolsForGroup(EditorUserBuildSettings.selectedBuildTargetGroup,
-                    out var defs);
+            PlayerSettings.GetScriptingDefineSymbolsForGroup(EditorUserBuildSettings.selectedBuildTargetGroup,
+                out var defs);
 
-                foreach (var define in defs)
-                    GUILayout.TextField(define);
+            foreach (var define in defs)
+                GUILayout.TextField(define);
                 
-                GUILayout.Space(10);
-
-            }
-            
-            EditorGUILayout.EndFoldoutHeaderGroup();
-            
-            GUILayout.EndVertical();
+            GUILayout.Space(10);
         }
 
         private void OnChangeCheats(bool value)

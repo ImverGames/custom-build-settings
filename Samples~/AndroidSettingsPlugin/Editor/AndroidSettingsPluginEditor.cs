@@ -6,10 +6,10 @@ using UnityEngine;
 
 namespace ImverGames.CustomBuildSettings.AndroidSettings.Editor
 {
-    [PluginOrder(0)]
+    [PluginOrder(0, "Android/AndroidSettingsPlugin")]
     public class AndroidSettingsPluginEditor : IBuildPluginEditor
     {
-        private BuildIncrementorData buildIncrementorData;
+        private BuildDataProvider buildDataProvider;
         
         private BuildValue<bool> developmentBuild;
         private BuildValue<string> packageName;
@@ -23,9 +23,9 @@ namespace ImverGames.CustomBuildSettings.AndroidSettings.Editor
 
         
         
-        public void InvokeSetupPlugin(BuildIncrementorData buildIncrementorData)
+        public void InvokeSetupPlugin(BuildDataProvider buildDataProvider)
         {
-            this.buildIncrementorData = buildIncrementorData;
+            this.buildDataProvider = buildDataProvider;
 
             developmentBuild = new BuildValue<bool>();
             packageName = new BuildValue<string>();
@@ -42,7 +42,7 @@ namespace ImverGames.CustomBuildSettings.AndroidSettings.Editor
             developmentBuild.OnValueChanged += DevelopmentBuildOnOnValueChanged;
             packageName.OnValueChanged += PackageNameOnOnValueChanged;
             bundleVersion.OnValueChanged += BundleVersionOnOnValueChanged;
-            buildIncrementorData.SelectedBuildType.OnValueChanged += BuildTypeSettingsOnOnValueChanged;
+            buildDataProvider.SelectedBuildType.OnValueChanged += BuildTypeSettingsOnOnValueChanged;
         }
 
         public void InvokeOnFocusPlugin()
@@ -78,7 +78,7 @@ namespace ImverGames.CustomBuildSettings.AndroidSettings.Editor
         
         private void BuildTypeSettingsOnOnValueChanged(EBuildType eBuildType)
         {
-            switch (buildIncrementorData.SelectedBuildType.Value)
+            switch (buildDataProvider.SelectedBuildType.Value)
             {
                 case EBuildType.RELEASE:
                     developmentBuild.Value = false;
@@ -176,10 +176,10 @@ namespace ImverGames.CustomBuildSettings.AndroidSettings.Editor
                 bundleVersion = null;
             }
 
-            if (buildIncrementorData != null)
+            if (buildDataProvider != null)
             {
-                buildIncrementorData.SelectedBuildType.OnValueChanged -= BuildTypeSettingsOnOnValueChanged;
-                buildIncrementorData = null;
+                buildDataProvider.SelectedBuildType.OnValueChanged -= BuildTypeSettingsOnOnValueChanged;
+                buildDataProvider = null;
             }
         }
     }

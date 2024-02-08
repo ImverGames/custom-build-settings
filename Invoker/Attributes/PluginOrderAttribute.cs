@@ -6,10 +6,12 @@ namespace ImverGames.CustomBuildSettings.Invoker
     public class PluginOrderAttribute : Attribute
     {
         public int Order { get; private set; }
+        public string NamePath { get; private set; }
 
-        public PluginOrderAttribute(int order)
+        public PluginOrderAttribute(int order, string namePath = "")
         {
             Order = order;
+            NamePath = namePath;
         }
     }
 }
