@@ -1,24 +1,25 @@
 ﻿using System;
 using ImverGames.CustomBuildSettings.Data;
+using ImverGames.CustomBuildSettings.Invoker;
 using SRDebugger;
 using UnityEditor;
 using UnityEngine;
 
 namespace ImverGames.CustomBuildSettings.SRDebuggerSettings.Editor
 {
+    [PluginOrder(3, "SRDebug/SRDebugPlugin")]
     public class SRDebugPluginEditor : IBuildPluginEditor
     {
-        private BuildIncrementorData buildIncrementorData;
+        private BuildDataProvider buildDataProvider;
         
-        private bool foldout = true;
         private bool manualy = true;
         
         private BuildValue<bool> IsEnabled;
         private BuildValue<Settings.TriggerEnableModes> triggerEnableMode;
 
-        public void InvokeSetupPlugin(BuildIncrementorData buildIncrementorData)
+        public void InvokeSetupPlugin(BuildDataProvider buildDataProvider)
         {
-            this.buildIncrementorData = buildIncrementorData;
+            this.buildDataProvider = buildDataProvider;
 
             IsEnabled = new BuildValue<bool>();
             triggerEnableMode = new BuildValue<Settings.TriggerEnableModes>();
@@ -28,7 +29,7 @@ namespace ImverGames.CustomBuildSettings.SRDebuggerSettings.Editor
             
             IsEnabled.OnValueChanged += IsEnabledOnOnValueChanged;
             triggerEnableMode.OnValueChanged += TriggerEnableModeOnOnValueChanged;
-            buildIncrementorData.SelectedBuildType.OnValueChanged += SelectedBuildTypeOnOnValueChanged;
+            buildDataProvider.SelectedBuildType.OnValueChanged += SelectedBuildTypeOnOnValueChanged;
         }
 
         public void InvokeOnFocusPlugin()
@@ -55,45 +56,30 @@ namespace ImverGames.CustomBuildSettings.SRDebuggerSettings.Editor
 
         public void InvokeGUIPlugin()
         {
-            GUILayout.BeginVertical(EditorStyles.helpBox);
-            foldout = EditorGUILayout.BeginFoldoutHeaderGroup(foldout, "SRDebugger activity");
+            GUILayout.Space(5);
+                
+            manualy = GUILayout.Toggle(manualy, "Manually change settings");
+                
+            GUILayout.Space(10);
 
-            if (foldout)
+            if (manualy)
             {
+                IsEnabled.Value = GUILayout.Toggle(IsEnabled.Value, "Enable SRDebugger");
+                    
                 GUILayout.Space(5);
-                
-                manualy = GUILayout.Toggle(manualy, "Manually change settings");
-                
-                GUILayout.Space(10);
-
-                if (manualy)
-                {
-                    IsEnabled.Value = GUILayout.Toggle(IsEnabled.Value, "Enable SRDebugger");
                     
-                    GUILayout.Space(5);
-                    
-                    triggerEnableMode.Value =
-                        (Settings.TriggerEnableModes)EditorGUILayout.EnumPopup("Enable SRDebugger Trigger",
-                            triggerEnableMode.Value);
+                triggerEnableMode.Value =
+                    (Settings.TriggerEnableModes)EditorGUILayout.EnumPopup("Enable SRDebugger Trigger",
+                        triggerEnableMode.Value);
 
-                    EditorGUILayout.EndFoldoutHeaderGroup();
-                    
-                    GUILayout.EndVertical();
-
-                    return;
-                }
-                else
-                {
-                    GUILayout.Label("Activity SRDebugger Depends on the type of build at \"Release\" it will be disabled and unavailable");
-                }
-
+                return;
+            }
+            else
+            {
+                GUILayout.Label("Activity SRDebugger Depends on the type of build at \"Release\" it will be disabled and unavailable");
             }
 
-            Settings.Instance.EnableTrigger = GetTriggerMode(buildIncrementorData.SelectedBuildType.Value);
-            
-            EditorGUILayout.EndFoldoutHeaderGroup();
-            
-            GUILayout.EndVertical();
+            Settings.Instance.EnableTrigger = GetTriggerMode(buildDataProvider.SelectedBuildType.Value);
         }
 
         private Settings.TriggerEnableModes GetTriggerMode(EBuildType buildType)
@@ -141,11 +127,10 @@ namespace ImverGames.CustomBuildSettings.SRDebuggerSettings.Editor
                 triggerEnableMode = null;
             }
 
-            if (buildIncrementorData != null)
+            if (buildDataProvider != null)
             {
-                buildIncrementorData.SelectedBuildType.OnValueChanged += SelectedBuildTypeOnOnValueChanged;
-
-                buildIncrementorData = null;
+                buildDataProvider.SelectedBuildType.OnValueChanged += SelectedBuildTypeOnOnValueChanged;
+                buildDataProvider = null;
             }
         }
     }

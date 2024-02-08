@@ -6,7 +6,7 @@ namespace ImverGames.BuildIncrementor.Editor
 {
     public class CustomBuildPreferencesWindow : EditorWindow
     {
-        private const string STORAGE_PATH = "Assets/Editor Default Resources/Build Incrementor/Global Storage/";
+        private const string STORAGE_PATH = "Assets/Editor Default Resources/Custom Build Settings/Global Storage/";
         private const string STORAGE_NAME = "GlobalDataStorage.asset";
         private static string fullPath => $"{STORAGE_PATH}{STORAGE_NAME}";
         

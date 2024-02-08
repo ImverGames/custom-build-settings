@@ -2,7 +2,7 @@
 {
     public interface IBuildPluginEditor
     {
-        void InvokeSetupPlugin(BuildIncrementorData buildIncrementorData);
+        void InvokeSetupPlugin(BuildDataProvider buildDataProvider);
         void InvokeOnFocusPlugin();
         void InvokeGUIPlugin();
         void InvokeBeforeBuild();

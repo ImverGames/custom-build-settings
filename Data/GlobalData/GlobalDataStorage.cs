@@ -10,6 +10,7 @@ namespace ImverGames.CustomBuildSettings.Data
     public class GlobalDataStorage : ScriptableObject
     {
         [SerializeField] private List<DataStorage> pluginsData;
+        [SerializeField] public List<PluginsStorage> editorPlugins;
 
         public GlobalDataStorage()
         {
@@ -19,79 +20,51 @@ namespace ImverGames.CustomBuildSettings.Data
         public bool TryGetPluginData<T>(out T data)
         {
             data = default;
-
-            try
-            {
-                var dataString = pluginsData.Find(storage => StringToType(storage.PluginTypeName) == typeof(T)).PluginData;
             
-                data = JsonUtility.FromJson<T>(dataString);
-                
+            var storage = pluginsData.Find(s => StringToType(s.PluginTypeName) == typeof(T));
+            
+            if (storage != null)
+            {
+                data = JsonUtility.FromJson<T>(storage.PluginData);
                 return data != null;
             }
-            catch
-            {
-                return false;
-            }
+            return false;
         }
 
         public T SaveOrUpdatePluginData<T>(T data)
         {
             EditorUtility.SetDirty(this);
 
-            string pluginData = string.Empty;
+            var storage = pluginsData.Find(s => StringToType(s.PluginTypeName) == typeof(T));
             
-            try
+            if (storage == null)
             {
-                var existedStorage = GetPluginStorage<T>();
-
-                existedStorage.PluginData = JsonUtility.ToJson(data);
-
-                pluginData = existedStorage.PluginData;
+                storage = new DataStorage { PluginTypeName = typeof(T).AssemblyQualifiedName };
+                pluginsData.Add(storage);
             }
-            catch
-            {
-                var dataStorage = new DataStorage
-                {
-                    PluginTypeName = typeof(T).AssemblyQualifiedName,
-                    PluginData = JsonUtility.ToJson(data)
-                };
 
-                pluginData = dataStorage.PluginData;
+            storage.PluginData = JsonUtility.ToJson(data);
+        
+            AssetDatabase.SaveAssets();
 
-                pluginsData.Add(dataStorage);
-            }
-            
-            AssetDatabase.SaveAssetIfDirty(this);
-            
-            return JsonUtility.FromJson<T>(pluginData);
+            return data;
         }
-        
-        private DataStorage GetPluginStorage<T>()
-        {
-            return pluginsData.Find(storage => Type.GetType(storage.PluginTypeName) == typeof(T));
-        }
-        
+    
         private Type StringToType(string typeString)
         {
-            if (string.IsNullOrEmpty(typeString))
+            if (string.IsNullOrEmpty(typeString)) return null;
+
+            Type type = Type.GetType(typeString, false);
+            
+            if (type != null) return type;
+
+            foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
-                return null;
+                type = assembly.GetType(typeString, false);
+                if (type != null) return type;
             }
 
-            Type type = Type.GetType(typeString);
-            if (type == null)
-            {
-                foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
-                {
-                    type = assembly.GetType(typeString);
-                    if (type != null)
-                    {
-                        break;
-                    }
-                }
-            }
-
-            return type;
+            return null;
         }
     }
 }

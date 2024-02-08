@@ -1,9 +1,7 @@
 {
     "name": "imvergames.custombuildsettings.invoker",
     "rootNamespace": "",
-    "references": [
-        "GUID:1daf152e49a1444498ae79f1f39f5e7c"
-    ],
+    "references": [],
     "includePlatforms": [
         "Editor"
     ],
