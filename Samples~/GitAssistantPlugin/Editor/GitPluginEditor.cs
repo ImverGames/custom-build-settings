@@ -12,20 +12,29 @@ namespace ImverGames.CustomBuildSettings.GitPlugin.Editor
         private string gitCommandOutput = "Command output will be shown here...";
         private Vector2 scrollPosition;
 
+        private bool available;
+
         private BuildDataProvider buildDataProvider;
         
         public void InvokeSetupPlugin(BuildDataProvider buildDataProvider)
         {
             this.buildDataProvider = buildDataProvider;
+
+            available = buildDataProvider.GitAssistant.CheckGitAvailable();
         }
 
         public void InvokeOnFocusPlugin()
         {
-            
+            available = buildDataProvider.GitAssistant.CheckGitAvailable();
         }
 
         public void InvokeGUIPlugin()
         {
+            if (!available)
+            {
+                GUILayout.Label("Git not Available", EditorStyles.boldLabel);
+                return;
+            }
             GUILayout.Label("Execute Git Command", EditorStyles.boldLabel);
 
             gitCommand = EditorGUILayout.TextField("Git Command Without 'git'", gitCommand);
