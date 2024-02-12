@@ -1,5 +1,6 @@
-﻿using System;
+using System;
 using System.Diagnostics;
+using System.Threading;
 using System.Threading.Tasks;
 using UnityEditor;
 using UnityEngine;
@@ -9,54 +10,65 @@ namespace ImverGames.CustomBuildSettings.Data
     public class GitAssistant
     {
         public bool addHeshToVersion;
-        public bool gitAvailable { get; private set; }
-        public bool isFetching { get; private set; }
+        private bool _gitAvailable;
+        private bool _isFetching;
+        private string _commitShortHash;
+        private string _commitFullHash;
+        private string _currentBranch;
+        private string _commitsBehind;
+        private string _fetchingText;
+        private string _projectPath;
+        private DateTime _lastUpdateTime;
+        private int _dotCount;
+        private CancellationTokenSource _cancellationTokenSource;
 
-        public string commitShortHash { get; private set; }
-        public string commitFullHash { get; private set; }
-        public string currentBranch { get; private set; }
-        public string commitsBehind { get; private set; }
-        public string fetchingText { get; private set; }
-        
-        private string projectPath;
-        private DateTime lastUpdateTime;
-        private int dotCount;
+        public bool gitAvailable => _gitAvailable;
+        public bool isFetching => _isFetching;
+        public string commitShortHash => _commitShortHash;
+        public string commitFullHash => _commitFullHash;
+        public string currentBranch => _currentBranch;
+        public string commitsBehind => _commitsBehind;
+        public string fetchingText => _fetchingText;
 
         public GitAssistant()
         {
-            lastUpdateTime = DateTime.Now;
-            fetchingText = "Git fetching";
-            dotCount = 3;
-            
-            projectPath = Application.dataPath;
+            _lastUpdateTime = DateTime.Now;
+            _fetchingText = "Git fetching";
+            _dotCount = 3;
+            _projectPath = Application.dataPath;
+            _cancellationTokenSource = new CancellationTokenSource();
         }
 
-        public void CheckAndUpdateGitInfo(EditorWindow window = null)
+        public async Task CheckAndUpdateGitInfo(EditorWindow window = null)
         {
-            if (CheckGitAvailable())
+            if (await CheckGitAvailable())
             {
-                UpdateGitInfoAsync(window);
+                await UpdateGitInfoAsync(window);
             }
         }
-        
+
         public void AnimateLoadingText()
         {
-            if (isFetching && (DateTime.Now - lastUpdateTime).TotalSeconds > 0.5)
+            if (_isFetching && (DateTime.Now - _lastUpdateTime).TotalSeconds > 0.5)
             {
-                dotCount = (dotCount + 1) % 4;
-                fetchingText = "Git Fetching" + new string('.', dotCount);
-                lastUpdateTime = DateTime.Now;
+                _dotCount = (_dotCount + 1) % 4;
+                _fetchingText = "Git Fetching" + new string('.', _dotCount);
+                _lastUpdateTime = DateTime.Now;
             }
         }
 
-        public bool CheckGitAvailable()
+        public async Task<bool> CheckGitAvailable()
         {
-            gitAvailable = CheckGitInstallation() && CheckIfInsideWorkTree();
-
-            return gitAvailable;
+            _gitAvailable = await CheckGitInstallation() && await CheckIfInsideWorkTree();
+            return _gitAvailable;
         }
-        
-        public string ExecuteGitCommand(string command)
+
+        public async Task<string> ExecuteGitCommandAsync(string command)
+        {
+            return await Task.Run(() => ExecuteGitCommand(command), _cancellationTokenSource.Token);
+        }
+
+        private string ExecuteGitCommand(string command)
         {
             var processStartInfo = new ProcessStartInfo("git", command)
             {
@@ -64,7 +76,7 @@ namespace ImverGames.CustomBuildSettings.Data
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true,
-                WorkingDirectory = projectPath
+                WorkingDirectory = _projectPath
             };
 
             using (var process = Process.Start(processStartInfo))
@@ -77,48 +89,58 @@ namespace ImverGames.CustomBuildSettings.Data
             }
         }
 
-        private async void UpdateGitInfoAsync(EditorWindow window = null)
+        private async Task UpdateGitInfoAsync(EditorWindow window = null)
         {
-            isFetching = true;
-            await Task.Run(UpdateGitInfo);
-            isFetching = false;
-            
-            if(window != null)
-                window.Repaint();
+            _isFetching = true;
+            try
+            {
+                await Task.Run(() => UpdateGitInfo(), _cancellationTokenSource.Token);
+            }
+            finally
+            {
+                _isFetching = false;
+                if (window != null)
+                    window.Repaint();
+            }
         }
-        
+
         private void UpdateGitInfo()
         {
-            UpdateCommitHash();
-            UpdateCurrentBranch();
-            UpdateCommitsBehind();
-        }
-        
-        private bool CheckGitInstallation()
-        {
-            return ExecuteGitCommand("--version").Length > 0;
+            UpdateCommitHash().Wait(_cancellationTokenSource.Token);
+            UpdateCurrentBranch().Wait(_cancellationTokenSource.Token);
+            UpdateCommitsBehind().Wait(_cancellationTokenSource.Token);
         }
 
-        private bool CheckIfInsideWorkTree()
+        private async Task UpdateCommitHash()
         {
-            return ExecuteGitCommand("rev-parse --is-inside-work-tree").Trim() == "true";
+            var str = await ExecuteGitCommandAsync("rev-parse HEAD");
+            _commitFullHash = str.Trim();
+            _commitShortHash = _commitFullHash.Substring(0, Math.Min(7, _commitFullHash.Length));
         }
 
-        private void UpdateCommitHash()
+        private async Task UpdateCurrentBranch()
         {
-            commitFullHash = ExecuteGitCommand("rev-parse HEAD").Trim();
-            commitShortHash = commitFullHash.Substring(0, Math.Min(7, commitFullHash.Length));
+            var str = await ExecuteGitCommandAsync("rev-parse --abbrev-ref HEAD");
+            _currentBranch = str.Trim();
         }
-        
-        private void UpdateCurrentBranch()
+
+        private async Task UpdateCommitsBehind()
         {
-            currentBranch = ExecuteGitCommand("rev-parse --abbrev-ref HEAD").Trim();
+            await ExecuteGitCommandAsync("fetch");
+            var str = await ExecuteGitCommandAsync($"rev-list --count HEAD...origin/{_currentBranch}");
+            _commitsBehind = str.Trim();
         }
-        
-        private void UpdateCommitsBehind()
+
+        private async Task<bool> CheckGitInstallation()
         {
-            ExecuteGitCommand("fetch");
-            commitsBehind = ExecuteGitCommand($"rev-list --count HEAD...origin/{currentBranch}").Trim();
+            var str = await ExecuteGitCommandAsync("--version");
+            return str.Length > 0;
+        }
+
+        private async Task<bool> CheckIfInsideWorkTree()
+        {
+            var str = await ExecuteGitCommandAsync("rev-parse --is-inside-work-tree");
+            return str.Trim() == "true";
         }
     }
 }
