@@ -1,4 +1,4 @@
-﻿using ImverGames.CustomBuildSettings.Data;
+using ImverGames.CustomBuildSettings.Data;
 using ImverGames.CustomBuildSettings.Invoker;
 using UnityEditor;
 using UnityEngine;
@@ -12,23 +12,23 @@ namespace ImverGames.CustomBuildSettings.GitPlugin.Editor
         private string gitCommandOutput = "Command output will be shown here...";
         private Vector2 scrollPosition;
 
-        private bool available;
+        private bool available = false;
 
         private BuildDataProvider buildDataProvider;
         
-        public void InvokeSetupPlugin(BuildDataProvider buildDataProvider)
+        public async void InvokeSetupPlugin(BuildDataProvider buildDataProvider)
         {
             this.buildDataProvider = buildDataProvider;
 
-            available = buildDataProvider.GitAssistant.CheckGitAvailable();
+            available = await buildDataProvider.GitAssistant.CheckGitAvailable();
         }
 
-        public void InvokeOnFocusPlugin()
+        public async void InvokeOnFocusPlugin()
         {
-            available = buildDataProvider.GitAssistant.CheckGitAvailable();
+            available = await buildDataProvider.GitAssistant.CheckGitAvailable();
         }
 
-        public void InvokeGUIPlugin()
+        public async void InvokeGUIPlugin()
         {
             if (!available)
             {
@@ -41,7 +41,8 @@ namespace ImverGames.CustomBuildSettings.GitPlugin.Editor
 
             if (GUILayout.Button("Execute Command"))
             {
-                gitCommandOutput = buildDataProvider.GitAssistant.ExecuteGitCommand(gitCommand);
+                gitCommandOutput = await buildDataProvider.GitAssistant.ExecuteGitCommandAsync(gitCommand);
+                return;
             }
 
             GUILayout.Label("Command Output:");
