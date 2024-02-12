@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -104,8 +104,7 @@ namespace ImverGames.CustomBuildSettings.Editor
             if (globalDataStorage.editorPlugins != null)
             {
                 foreach (var editorPlugin in globalDataStorage.editorPlugins)
-                    InterfaceImplementationsInvoker.InvokeMethodOnAllImplementations<IBuildPluginEditor>(editorPlugin.BuildPluginEditor,
-                        "InvokeOnFocusPlugin", null);
+                    editorPlugin.BuildPluginEditor.InvokeOnFocusPlugin();
             }
             
             if(customBuildReportsWindow != null)
@@ -120,8 +119,7 @@ namespace ImverGames.CustomBuildSettings.Editor
         private void EnablePlugins()
         {
             foreach (var editorPlugin in globalDataStorage.editorPlugins)
-                InterfaceImplementationsInvoker.InvokeMethodOnAllImplementations<IBuildPluginEditor>(editorPlugin.BuildPluginEditor,
-                    "InvokeSetupPlugin", new object[] { buildDataProvider });
+                editorPlugin.BuildPluginEditor.InvokeSetupPlugin(buildDataProvider);
         }
 
         #region BuildVersion Formating
@@ -590,9 +588,7 @@ namespace ImverGames.CustomBuildSettings.Editor
                 {
                     EditorUtility.SetDirty(globalDataStorage);
                     
-                    InterfaceImplementationsInvoker.InvokeMethodOnAllImplementations<IBuildPluginEditor>(
-                        globalDataStorage.editorPlugins[i].BuildPluginEditor, 
-                        "InvokeDestroyPlugin", null);
+                    globalDataStorage.editorPlugins[i].BuildPluginEditor.InvokeDestroyPlugin();
                     
                     globalDataStorage.editorPlugins.RemoveAt(i);
                     
@@ -607,9 +603,7 @@ namespace ImverGames.CustomBuildSettings.Editor
 
                 if (globalDataStorage.editorPlugins[i].Expand)
                 {
-                    InterfaceImplementationsInvoker.InvokeMethodOnAllImplementations<IBuildPluginEditor>(
-                        globalDataStorage.editorPlugins[i].BuildPluginEditor,
-                        "InvokeGUIPlugin", null);
+                    globalDataStorage.editorPlugins[i].BuildPluginEditor.InvokeGUIPlugin();
                 }
                 
                 GUILayout.EndVertical();
@@ -660,8 +654,8 @@ namespace ImverGames.CustomBuildSettings.Editor
             {
                 EditorUtility.SetDirty(globalDataStorage);
                     
-                InterfaceImplementationsInvoker.InvokeMethodOnAllImplementations<IBuildPluginEditor>(pluginInstance,
-                    "InvokeSetupPlugin", new object[] { buildDataProvider });
+                pluginInstance.InvokeSetupPlugin(buildDataProvider);
+                
                 globalDataStorage.editorPlugins.Add(new PluginsStorage() {BuildPluginEditor = pluginInstance, Expand = true});
             }
         }
@@ -729,15 +723,13 @@ namespace ImverGames.CustomBuildSettings.Editor
         private void InvokePluginBeforeBuild()
         {
             foreach (var editorPlugin in globalDataStorage.editorPlugins)
-                InterfaceImplementationsInvoker.InvokeMethodOnAllImplementations<IBuildPluginEditor>(editorPlugin.BuildPluginEditor,
-                    "InvokeBeforeBuild", null);
+                editorPlugin.BuildPluginEditor.InvokeBeforeBuild();
         }
         
         private void InvokePluginAfterBuild()
         {
             foreach (var editorPlugin in globalDataStorage.editorPlugins)
-                InterfaceImplementationsInvoker.InvokeMethodOnAllImplementations<IBuildPluginEditor>(editorPlugin.BuildPluginEditor,
-                    "InvokeAfterBuild", null);
+                editorPlugin.BuildPluginEditor.InvokeAfterBuild();
         }
 
         private void BuildGame(BuildOptions options)
@@ -847,9 +839,7 @@ namespace ImverGames.CustomBuildSettings.Editor
             EditorApplication.update -= OnUpdate;
 
             foreach (var editorPlugin in globalDataStorage.editorPlugins)
-                InterfaceImplementationsInvoker.InvokeMethodOnAllImplementations<IBuildPluginEditor>(
-                    editorPlugin.BuildPluginEditor,
-                    "InvokeDestroyPlugin", null);
+                editorPlugin.BuildPluginEditor.InvokeDestroyPlugin();
 
             gitAssistant = null;
             buildDataProvider = null;
