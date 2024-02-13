@@ -487,7 +487,7 @@ namespace ImverGames.CustomBuildSettings.Editor
 
                 buildDataProvider.VersionMeta.Value = gitAssistant.commitShortHash;
 
-                GUILayout.Label(new GUIContent(gitAssistant.commitShortHash), GUILayout.Width(50));
+                GUILayout.Label(new GUIContent(gitAssistant.commitShortHash), GUILayout.Width(55));
             }
             else if (gitAssistant.gitAvailable && !buildDataProvider.AddHashToVersion.Value)
             {
