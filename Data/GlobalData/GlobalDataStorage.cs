@@ -1,4 +1,4 @@
-﻿#if UNITY_EDITOR
+#if UNITY_EDITOR
 
 using System;
 using System.Collections.Generic;
@@ -44,8 +44,6 @@ namespace ImverGames.CustomBuildSettings.Data
             }
 
             storage.PluginData = JsonUtility.ToJson(data);
-        
-            AssetDatabase.SaveAssets();
 
             return data;
         }
