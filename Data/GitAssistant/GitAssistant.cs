@@ -9,7 +9,6 @@ namespace ImverGames.CustomBuildSettings.Data
 {
     public class GitAssistant
     {
-        public bool addHeshToVersion;
         private bool _gitAvailable;
         private bool _isFetching;
         private string _commitShortHash;
