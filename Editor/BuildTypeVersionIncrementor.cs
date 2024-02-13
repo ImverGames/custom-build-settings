@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using ImverGames.CustomBuildSettings.Data;
@@ -60,7 +60,7 @@ namespace ImverGames.CustomBuildSettings.Editor
                 var newVersion = $"{major}.{minor}.{patch}";
                 
                 var fullVersion = buildData.RegisterOrUpdateVersion(buildIncrementorData.SelectedBuildType.Value, newVersion,
-                    buildIncrementorData.VersionTag.Value, buildIncrementorData.VersionMeta.Value);
+                    buildIncrementorData.VersionTag.Value, buildIncrementorData.VersionMeta.Value, false);
             
                 PlayerSettings.bundleVersion = fullVersion;
                 
@@ -135,7 +135,7 @@ namespace ImverGames.CustomBuildSettings.Editor
 
             buildData.BuildType = eBuildType;
 
-            buildData.RegisterOrUpdateVersion(eBuildType, version, tag, meta);
+            buildData.RegisterOrUpdateVersion(eBuildType, version, tag, meta, false);
 
             var json = JsonUtility.ToJson(buildData, true);
             
