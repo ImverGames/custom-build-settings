@@ -1,4 +1,4 @@
-﻿namespace ImverGames.CustomBuildSettings.Data
+namespace ImverGames.CustomBuildSettings.Data
 {
     public class BuildDataProvider
     {
@@ -7,7 +7,8 @@
         public BuildValue<string> Version;
         public BuildValue<string> VersionTag;
         public BuildValue<string> VersionMeta;
-        
+        public BuildValue<bool> AddHashToVersion;
+
         public BuildPreferencesData BuildPreferencesData;
         public GitAssistant GitAssistant;
 
@@ -18,6 +19,8 @@
             Version = new BuildValue<string>();
             VersionTag = new BuildValue<string>();
             VersionMeta = new BuildValue<string>();
+            AddHashToVersion = new BuildValue<bool>();
+            
             BuildPreferencesData = new BuildPreferencesData();
             GitAssistant = new GitAssistant();
         }
