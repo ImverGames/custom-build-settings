@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace ImverGames.CustomBuildSettings.Data
@@ -14,12 +14,12 @@ namespace ImverGames.CustomBuildSettings.Data
             this.BuildType = buildType;
         }
 
-        public string RegisterOrUpdateVersion(EBuildType buildType, string version, string tag, string meta)
+        public string RegisterOrUpdateVersion(EBuildType buildType, string version, string tag, string meta, bool addHash)
         {
             var v = typeVersion.Find(v => v.BuildType == buildType);
             if (v == null)
             {
-                v = new BuildTypeVersion(buildType, version, tag, meta);
+                v = new BuildTypeVersion(buildType, version, tag, meta, addHash);
                 typeVersion.Add(v);
             }
             else
@@ -27,6 +27,7 @@ namespace ImverGames.CustomBuildSettings.Data
                 v.Version = version;
                 v.VersionTag = tag;
                 v.VersionMeta = meta;
+                v.AddHash = addHash;
             }
 
             return GetFullBuildVersion(buildType);
@@ -38,7 +39,7 @@ namespace ImverGames.CustomBuildSettings.Data
             return v != null
                 ? v.Version
                 : RegisterOrUpdateVersion(buildType, CreateVersionString(new[] { "D1", "D1", "D1" }), string.Empty,
-                    string.Empty);
+                    string.Empty, false);
         }
     
         public string GetBuildVersionTag(EBuildType buildType) =>
@@ -57,6 +58,9 @@ namespace ImverGames.CustomBuildSettings.Data
 
         public string GetBuildVersionMeta(EBuildType buildType) =>
             FindVersionByBuildType(buildType)?.VersionMeta ?? string.Empty;
+        
+        public bool GetHashMeta(EBuildType buildType) =>
+            FindVersionByBuildType(buildType)?.AddHash ?? false;
     
         private BuildTypeVersion FindVersionByBuildType(EBuildType buildType) =>
             typeVersion.Find(v => v.BuildType == buildType);
@@ -75,13 +79,15 @@ namespace ImverGames.CustomBuildSettings.Data
         public string Version;
         public string VersionTag;
         public string VersionMeta;
+        public bool AddHash;
 
-        public BuildTypeVersion(EBuildType buildType, string version, string versionTag, string versionMeta)
+        public BuildTypeVersion(EBuildType buildType, string version, string versionTag, string versionMeta, bool addHash = false)
         {
             BuildType = buildType;
             Version = version;
             VersionTag = versionTag;
             VersionMeta = versionMeta;
+            AddHash = addHash;
         }
     }
 }
