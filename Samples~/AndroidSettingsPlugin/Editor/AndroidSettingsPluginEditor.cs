@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using ImverGames.CustomBuildSettings.Data;
 using ImverGames.CustomBuildSettings.Invoker;
 using UnityEditor;
@@ -47,7 +47,8 @@ namespace ImverGames.CustomBuildSettings.AndroidSettings.Editor
 
         public void InvokeOnFocusPlugin()
         {
-            developmentBuild.Value = EditorUserBuildSettings.development;
+            if(developmentBuild != null) 
+                developmentBuild.Value = EditorUserBuildSettings.development;
             
             keystorePass = PlayerSettings.Android.keystorePass;
             keyaliasPass = PlayerSettings.Android.keyaliasPass;
