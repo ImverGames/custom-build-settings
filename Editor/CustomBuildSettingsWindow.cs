@@ -72,17 +72,40 @@ namespace ImverGames.CustomBuildSettings.Editor
             buildDataProvider.VersionTag.Value = buildData.GetBuildVersionTag(buildData.BuildType);
             buildDataProvider.VersionMeta.Value = buildData.GetBuildVersionMeta(buildData.BuildType);
             buildDataProvider.VersionFormat.Value = GetFormatTypeFromString(buildDataProvider.Version.Value);
+            buildDataProvider.AddHashToVersion.Value = buildData.GetHashMeta(buildData.BuildType);
             buildDataProvider.SelectedBuildType.Value = buildData.BuildType;
-            
+
             buildDataProvider.SelectedBuildType.OnValueChanged += OnChangeBuildTypeSettings;
             buildDataProvider.Version.OnValueChanged += OnChangeVersion;
             buildDataProvider.VersionFormat.OnValueChanged += OnChangeVersionFormat;
+            buildDataProvider.VersionMeta.OnValueChanged += VersionMetaOnOnValueChanged;
 
             EnablePlugins();
             
             buildDataProvider.GitAssistant.CheckAndUpdateGitInfo(this);
             
             EditorApplication.update += OnUpdate;
+        }
+
+        private void SaveBuildData()
+        {
+            var globalDataStorage = buildDataProvider.BuildPreferencesData.GlobalDataStorage;
+
+            if (globalDataStorage.TryGetPluginData<CustomBuildData>(out var buildData))
+            {
+                buildData.BuildType = buildDataProvider.SelectedBuildType.Value;
+
+                buildData.RegisterOrUpdateVersion(
+                    buildDataProvider.SelectedBuildType.Value,
+                    buildDataProvider.Version.Value,
+                    buildDataProvider.VersionTag.Value,
+                    buildDataProvider.VersionMeta.Value,
+                    buildDataProvider.AddHashToVersion.Value);
+
+                globalDataStorage.SaveOrUpdatePluginData(buildData);
+
+                PlayerSettings.bundleVersion = buildData.GetFullBuildVersion(buildData.BuildType);
+            }
         }
 
         private void OnFocus()
@@ -98,6 +121,7 @@ namespace ImverGames.CustomBuildSettings.Editor
                 buildDataProvider.VersionTag.Value = buildData.GetBuildVersionTag(buildData.BuildType);
                 buildDataProvider.VersionMeta.Value = buildData.GetBuildVersionMeta(buildData.BuildType);
                 buildDataProvider.VersionFormat.Value = GetFormatTypeFromString(buildDataProvider.Version.Value);
+                buildDataProvider.AddHashToVersion.Value = buildData.GetHashMeta(buildData.BuildType);
                 buildDataProvider.SelectedBuildType.Value = buildData.BuildType;
             }
 
@@ -437,7 +461,7 @@ namespace ImverGames.CustomBuildSettings.Editor
             //buildIncrementorData.VersionFormat.Value = (EVersionFormatType)EditorGUILayout.EnumPopup(buildIncrementorData.VersionFormat.Value);
 
             GUILayout.Space(10);
-            gitAssistant.addHeshToVersion = EditorGUILayout.Toggle("Add commit hash", gitAssistant.addHeshToVersion);
+            buildDataProvider.AddHashToVersion.Value = EditorGUILayout.Toggle("Add commit hash", buildDataProvider.AddHashToVersion.Value);
 
             if (EditorGUI.EndChangeCheck())
                 formatChange = true;
@@ -446,22 +470,7 @@ namespace ImverGames.CustomBuildSettings.Editor
             {
                 if (GUILayout.Button("Save Format"))
                 {
-                    var globalDataStorage = buildDataProvider.BuildPreferencesData.GlobalDataStorage;
-
-                    if (globalDataStorage.TryGetPluginData<CustomBuildData>(out var buildData))
-                    {
-                        buildData.BuildType = buildDataProvider.SelectedBuildType.Value;
-
-                        buildData.RegisterOrUpdateVersion(
-                            buildDataProvider.SelectedBuildType.Value,
-                            buildDataProvider.Version.Value,
-                            buildDataProvider.VersionTag.Value,
-                            buildDataProvider.VersionMeta.Value);
-
-                        globalDataStorage.SaveOrUpdatePluginData(buildData);
-
-                        PlayerSettings.bundleVersion = buildData.GetFullBuildVersion(buildData.BuildType);
-                    }
+                    SaveBuildData();
 
                     formatChange = false;
                 }
@@ -472,7 +481,7 @@ namespace ImverGames.CustomBuildSettings.Editor
 
         private void DrawVersionGitMeta()
         {
-            if (gitAssistant.gitAvailable && gitAssistant.addHeshToVersion)
+            if (gitAssistant.gitAvailable && buildDataProvider.AddHashToVersion.Value)
             {
                 GUILayout.Label(".", GUILayout.Width(8));
 
@@ -480,7 +489,7 @@ namespace ImverGames.CustomBuildSettings.Editor
 
                 GUILayout.Label(new GUIContent(gitAssistant.commitShortHash), GUILayout.Width(50));
             }
-            else if (gitAssistant.gitAvailable && !gitAssistant.addHeshToVersion)
+            else if (gitAssistant.gitAvailable && !buildDataProvider.AddHashToVersion.Value)
             {
                 buildDataProvider.VersionMeta.Value = string.Empty;
             }
@@ -679,16 +688,12 @@ namespace ImverGames.CustomBuildSettings.Editor
             switch (buildDataProvider.SelectedBuildType.Value)
             {
                 case EBuildType.RELEASE:
-                    gitAssistant.addHeshToVersion = false;
                     break;
                 case EBuildType.MILESTONE:
-                    gitAssistant.addHeshToVersion = false;
                     break;
                 case EBuildType.DAILY:
-                    gitAssistant.addHeshToVersion = false;
                     break;
                 case EBuildType.DEVELOPMENT:
-                    gitAssistant.addHeshToVersion = true;
                     break;
                 default:
                     throw new ArgumentOutOfRangeException();
@@ -701,6 +706,7 @@ namespace ImverGames.CustomBuildSettings.Editor
                 buildDataProvider.Version.Value = buildData.GetBuildVersion(eBuildType);
                 buildDataProvider.VersionTag.Value = buildData.GetBuildVersionTag(eBuildType);
                 buildDataProvider.VersionMeta.Value = buildData.GetBuildVersionMeta(eBuildType);
+                buildDataProvider.AddHashToVersion.Value = buildData.GetHashMeta(eBuildType);
                 
                 buildData.BuildType = eBuildType;
                         
@@ -708,12 +714,18 @@ namespace ImverGames.CustomBuildSettings.Editor
                     eBuildType,
                     buildDataProvider.Version.Value,
                     buildDataProvider.VersionTag.Value, 
-                    buildDataProvider.VersionMeta.Value);
+                    buildDataProvider.VersionMeta.Value,
+                    buildDataProvider.AddHashToVersion.Value);
 
                 globalDataStorage.SaveOrUpdatePluginData(buildData);
                 
                 PlayerSettings.bundleVersion = buildData.GetFullBuildVersion(eBuildType);
             }
+        }
+        
+        private void VersionMetaOnOnValueChanged(string meta)
+        {
+            SaveBuildData();
         }
 
         #endregion
@@ -835,6 +847,7 @@ namespace ImverGames.CustomBuildSettings.Editor
             buildDataProvider.SelectedBuildType.OnValueChanged -= OnChangeBuildTypeSettings;
             buildDataProvider.Version.OnValueChanged -= OnChangeVersion;
             buildDataProvider.VersionFormat.OnValueChanged -= OnChangeVersionFormat;
+            buildDataProvider.VersionMeta.OnValueChanged -= VersionMetaOnOnValueChanged;
             
             EditorApplication.update -= OnUpdate;
 
