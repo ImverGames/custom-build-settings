@@ -12,6 +12,8 @@ namespace ImverGames.CustomBuildSettings.Data
         public BuildPreferencesData BuildPreferencesData;
         public GitAssistant GitAssistant;
 
+        public string BuildPath;
+
         public BuildDataProvider()
         {
             SelectedBuildType = new BuildValue<EBuildType>();
@@ -23,6 +25,8 @@ namespace ImverGames.CustomBuildSettings.Data
             
             BuildPreferencesData = new BuildPreferencesData();
             GitAssistant = new GitAssistant();
+            
+            BuildPath = string.Empty;
         }
     }
 }
