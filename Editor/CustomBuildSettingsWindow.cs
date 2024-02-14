@@ -748,9 +748,11 @@ namespace ImverGames.CustomBuildSettings.Editor
         {
             string extension = GetExtensionForTarget(EditorUserBuildSettings.activeBuildTarget);
             string defaultName = $"{Application.productName}_{buildDataProvider.SelectedBuildType.Value}{extension}";
-            string path = EditorUtility.SaveFilePanel("Choose Location and Name for Build", "", defaultName, extension);
+            string path = EditorUtility.SaveFilePanel("Choose Location and Name for Build", "", defaultName, extension.Replace(".", ""));
 
             if (string.IsNullOrEmpty(path)) return;
+            
+            buildDataProvider.BuildPath = path;
 
             InvokePluginBeforeBuild();
             
