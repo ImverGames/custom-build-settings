@@ -36,7 +36,7 @@ namespace ImverGames.CustomBuildSettings.Editor
 
         private GUIStyle centeredLabelStyle;
 
-        [MenuItem("File/Custom Build Settings #b")]
+        [MenuItem("File/Custom Build Settings &b")]
         public static void ShowWindow()
         {
             var window = GetWindow<CustomBuildSettingsWindow>("Custom Build Settings");
@@ -45,10 +45,10 @@ namespace ImverGames.CustomBuildSettings.Editor
 
         private void OnEnable()
         {
-            customBuildPreferences = new CustomBuildPreferencesWindow();
+            customBuildPreferences = EditorWindow.CreateInstance<CustomBuildPreferencesWindow>();
+            customBuildReportsWindow = EditorWindow.CreateInstance<CustomBuildReportsWindow>();
             buildDataProvider = new BuildDataProvider();
             customBuildReport = new CustomBuildReport();
-            customBuildReportsWindow = new CustomBuildReportsWindow();
 
             gitAssistant = buildDataProvider.GitAssistant;
             
@@ -57,13 +57,8 @@ namespace ImverGames.CustomBuildSettings.Editor
 
             globalDataStorage = buildDataProvider.BuildPreferencesData.GlobalDataStorage;
             
-            /*globalDataStorage.editorPlugins = InterfaceImplementationsInvoker.FindAllPluginsEditor<IBuildPluginEditor>();
-            globalDataStorage.editorPlugins = InterfaceImplementationsInvoker.GetOrderedPlugins<IBuildPluginEditor>(globalDataStorage.editorPlugins);*/
-            
             LoadScenes();
             SetupReorderableList();
-
-            //var globalDataStorage = buildDataProvider.BuildPreferencesData.GlobalDataStorage;
 
             if (!globalDataStorage.TryGetPluginData<CustomBuildData>(out var buildData))
                 buildData = globalDataStorage.SaveOrUpdatePluginData(new CustomBuildData(buildDataProvider.SelectedBuildType.Value));
@@ -624,10 +619,6 @@ namespace ImverGames.CustomBuildSettings.Editor
                 ShowAddPluginMenu();
             }
 
-            /*foreach (var editorPlugin in globalDataStorage.editorPlugins)
-                InterfaceImplementationsInvoker.InvokeMethodOnAllImplementations<IBuildPluginEditor>(editorPlugin,
-                    "InvokeGUIPlugin", null);*/
-            
             GUILayout.Space(10);
         }
         
@@ -855,11 +846,16 @@ namespace ImverGames.CustomBuildSettings.Editor
 
             foreach (var editorPlugin in globalDataStorage.editorPlugins)
                 editorPlugin.BuildPluginEditor.InvokeDestroyPlugin();
+            
+            buildDataProvider.GitAssistant.Dispose();
 
             gitAssistant = null;
             buildDataProvider = null;
             reorderableList = null;
             scenes = null;
+            
+            if(customBuildPreferences != null)
+                DestroyImmediate(customBuildPreferences);
             
             if(customBuildReportsWindow != null)
                 DestroyImmediate(customBuildReportsWindow);
