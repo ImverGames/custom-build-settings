@@ -19,7 +19,7 @@ namespace ImverGames.CustomBuildSettings.Data
         private string _projectPath;
         private DateTime _lastUpdateTime;
         private int _dotCount;
-        private CancellationTokenSource _cancellationTokenSource;
+        private CancellationTokenSource cancellationTokenSource;
 
         public bool gitAvailable => _gitAvailable;
         public bool isFetching => _isFetching;
@@ -35,7 +35,7 @@ namespace ImverGames.CustomBuildSettings.Data
             _fetchingText = "Git fetching";
             _dotCount = 3;
             _projectPath = Application.dataPath;
-            _cancellationTokenSource = new CancellationTokenSource();
+            cancellationTokenSource = new CancellationTokenSource();
         }
 
         public async Task CheckAndUpdateGitInfo(EditorWindow window = null)
@@ -62,12 +62,7 @@ namespace ImverGames.CustomBuildSettings.Data
             return _gitAvailable;
         }
 
-        public async Task<string> ExecuteGitCommandAsync(string command)
-        {
-            return await Task.Run(() => ExecuteGitCommand(command), _cancellationTokenSource.Token);
-        }
-
-        private string ExecuteGitCommand(string command)
+        public async Task<string> ExecuteGitCommandAsync(string command, int timeoutMilliseconds = 30000)
         {
             var processStartInfo = new ProcessStartInfo("git", command)
             {
@@ -78,13 +73,49 @@ namespace ImverGames.CustomBuildSettings.Data
                 WorkingDirectory = _projectPath
             };
 
-            using (var process = Process.Start(processStartInfo))
-            {
-                process.WaitForExit();
-                var output = process.StandardOutput.ReadToEnd();
-                var error = process.StandardError.ReadToEnd();
+            var tcs = new TaskCompletionSource<string>();
 
-                return string.IsNullOrEmpty(output) ? error : output;
+            using (var process = new Process { StartInfo = processStartInfo })
+            using (var cancellationToken = new CancellationTokenSource(timeoutMilliseconds))
+            {
+                process.EnableRaisingEvents = true;
+                process.Exited += (sender, args) =>
+                {
+                    if (cancellationToken.Token.IsCancellationRequested)
+                    {
+                        tcs.TrySetResult("Command was cancelled due to timeout.");
+                    }
+                    else
+                    {
+                        var output = process.StandardOutput.ReadToEnd();
+                        var error = process.StandardError.ReadToEnd();
+                        tcs.TrySetResult(string.IsNullOrEmpty(output) ? error : output);
+                    }
+                    process.Close();
+                    cancellationToken?.Dispose();
+                };
+
+                cancellationTokenSource.Token.Register(() =>
+                {
+                    cancellationToken?.Cancel();
+                    cancellationToken?.Dispose();
+                });
+
+                cancellationToken.Token.Register(() =>
+                {
+                    process.Kill();
+                });
+
+                try
+                {
+                    process.Start();
+                }
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+
+                return await tcs.Task;
             }
         }
 
@@ -93,7 +124,9 @@ namespace ImverGames.CustomBuildSettings.Data
             _isFetching = true;
             try
             {
-                await Task.Run(() => UpdateGitInfo(), _cancellationTokenSource.Token);
+                await UpdateCommitHash();
+                await UpdateCurrentBranch();
+                await UpdateCommitsBehind();
             }
             finally
             {
@@ -101,13 +134,6 @@ namespace ImverGames.CustomBuildSettings.Data
                 if (window != null)
                     window.Repaint();
             }
-        }
-
-        private void UpdateGitInfo()
-        {
-            UpdateCommitHash().Wait(_cancellationTokenSource.Token);
-            UpdateCurrentBranch().Wait(_cancellationTokenSource.Token);
-            UpdateCommitsBehind().Wait(_cancellationTokenSource.Token);
         }
 
         private async Task UpdateCommitHash()
@@ -140,6 +166,12 @@ namespace ImverGames.CustomBuildSettings.Data
         {
             var str = await ExecuteGitCommandAsync("rev-parse --is-inside-work-tree");
             return str.Trim() == "true";
+        }
+        
+        public void Dispose()
+        {
+            cancellationTokenSource?.Cancel();
+            cancellationTokenSource?.Dispose();
         }
     }
 }
