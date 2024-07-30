@@ -7,14 +7,14 @@ using UnityEngine;
 namespace ImverGames.CustomBuildSettings.DistributeToFirebase.Editor
 {
     [System.Serializable]
-    public class DistributeLogger
+    public class DistributeNotesGitLogger
     {
         [SerializeField] private List<DistributeLoggerData> loggerData;
         
         public IEnumerable<DistributeLoggerData> LoggerData => loggerData;
         public bool HasData => loggerData.Count > 0;
 
-        public DistributeLogger()
+        public DistributeNotesGitLogger()
         {
             loggerData = new List<DistributeLoggerData>();
         }
@@ -43,6 +43,8 @@ namespace ImverGames.CustomBuildSettings.DistributeToFirebase.Editor
         public void SaveToTextFile()
         {
             var path = EditorUtility.SaveFilePanel("Choose Location and Name for Release Notes", "", "ReleaseNotes", "txt");
+            
+            if (string.IsNullOrEmpty(path)) return;
             
             using (var file = new StreamWriter(path))
             {

@@ -9,7 +9,7 @@ namespace ImverGames.CustomBuildSettings.AndroidSettings.Editor
     [PluginOrder(0, "Android/AndroidSettingsPlugin")]
     public class AndroidSettingsPluginEditor : IBuildPluginEditor
     {
-        private BuildDataProvider buildDataProvider;
+        private MainBuildData mainBuildData;
         
         private BuildValue<bool> developmentBuild;
         private BuildValue<string> packageName;
@@ -23,9 +23,9 @@ namespace ImverGames.CustomBuildSettings.AndroidSettings.Editor
 
         
         
-        public void InvokeSetupPlugin(BuildDataProvider buildDataProvider)
+        public void InvokeSetupPlugin()
         {
-            this.buildDataProvider = buildDataProvider;
+            mainBuildData = DataBinder.GetData<MainBuildData>();
 
             developmentBuild = new BuildValue<bool>();
             packageName = new BuildValue<string>();
@@ -42,7 +42,7 @@ namespace ImverGames.CustomBuildSettings.AndroidSettings.Editor
             developmentBuild.OnValueChanged += DevelopmentBuildOnOnValueChanged;
             packageName.OnValueChanged += PackageNameOnOnValueChanged;
             bundleVersion.OnValueChanged += BundleVersionOnOnValueChanged;
-            buildDataProvider.SelectedBuildType.OnValueChanged += BuildTypeSettingsOnOnValueChanged;
+            mainBuildData.SelectedBuildType.OnValueChanged += BuildTypeSettingsOnOnValueChanged;
         }
 
         public void InvokeOnFocusPlugin()
@@ -50,11 +50,14 @@ namespace ImverGames.CustomBuildSettings.AndroidSettings.Editor
             if(developmentBuild != null) 
                 developmentBuild.Value = EditorUserBuildSettings.development;
             
+            if(packageName != null)
+                packageName.Value = PlayerSettings.GetApplicationIdentifier(EditorUserBuildSettings.selectedBuildTargetGroup);
+            
+            if(bundleVersion != null)
+                bundleVersion.Value = PlayerSettings.Android.bundleVersionCode;
+            
             keystorePass = PlayerSettings.Android.keystorePass;
             keyaliasPass = PlayerSettings.Android.keyaliasPass;
-
-            packageName.Value = PlayerSettings.GetApplicationIdentifier(EditorUserBuildSettings.selectedBuildTargetGroup);
-            bundleVersion.Value = PlayerSettings.Android.bundleVersionCode;
         }
 
         private void AndroidSDKVersionOnOnValueChanged(AndroidSdkVersions sdkVersions)
@@ -79,7 +82,7 @@ namespace ImverGames.CustomBuildSettings.AndroidSettings.Editor
         
         private void BuildTypeSettingsOnOnValueChanged(EBuildType eBuildType)
         {
-            switch (buildDataProvider.SelectedBuildType.Value)
+            switch (mainBuildData.SelectedBuildType.Value)
             {
                 case EBuildType.RELEASE:
                     developmentBuild.Value = false;
@@ -177,10 +180,10 @@ namespace ImverGames.CustomBuildSettings.AndroidSettings.Editor
                 bundleVersion = null;
             }
 
-            if (buildDataProvider != null)
+            if (mainBuildData != null)
             {
-                buildDataProvider.SelectedBuildType.OnValueChanged -= BuildTypeSettingsOnOnValueChanged;
-                buildDataProvider = null;
+                mainBuildData.SelectedBuildType.OnValueChanged -= BuildTypeSettingsOnOnValueChanged;
+                mainBuildData = null;
             }
         }
     }

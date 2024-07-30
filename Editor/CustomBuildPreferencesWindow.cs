@@ -6,55 +6,32 @@ namespace ImverGames.BuildIncrementor.Editor
 {
     public class CustomBuildPreferencesWindow : EditorWindow
     {
-        private const string STORAGE_PATH = "Assets/Editor Default Resources/Custom Build Settings/Global Storage/";
-        private const string STORAGE_NAME = "GlobalDataStorage.asset";
-        private static string fullPath => $"{STORAGE_PATH}{STORAGE_NAME}";
-        
-        private BuildPreferencesData buildPreferencesData;
+        public static CustomBuildPreferencesWindow Instance { get; private set; }
 
-        public CustomBuildPreferencesWindow ShowWindow()
-        {
-            return GetWindow<CustomBuildPreferencesWindow>("Custom Build Preferences");
-        }
+        private static BuildPreferencesData buildPreferencesData;
         
-        public void Initialize(BuildPreferencesData buildPreferencesData)
+        public static CustomBuildPreferencesWindow CreateOrFocusWindow()
         {
-            this.buildPreferencesData = buildPreferencesData;
-
-            if (!TryLoadDataStorage(out buildPreferencesData.GlobalDataStorage))
-                CreateStorage();
+            if (Instance == null)
+            {
+                Instance = GetWindow<CustomBuildPreferencesWindow>("Custom Build Preferences");
+                Instance.minSize = new Vector2(600, 300);
+                Instance.Show();
+            }
+            else
+            {
+                Instance.Focus();
+            }
+            
+            buildPreferencesData = DataBinder.GetData<BuildPreferencesData>();
+            
+            return Instance;
         }
 
         private void OnGUI()
         {
             buildPreferencesData.GlobalDataStorage = EditorGUILayout.ObjectField("Global Data Storage",
                 buildPreferencesData.GlobalDataStorage, typeof(GlobalDataStorage), false) as GlobalDataStorage;
-        }
-
-        private bool TryLoadDataStorage(out GlobalDataStorage globalDataStorage)
-        {
-            globalDataStorage = null;
-            
-            globalDataStorage = EditorGUIUtility.Load(fullPath) as GlobalDataStorage;
-
-            return globalDataStorage != null;
-        }
-
-        private void CreateStorage()
-        {
-            var directory = System.IO.Path.GetDirectoryName(fullPath);
-            
-            if (!System.IO.Directory.Exists(directory))
-            {
-                System.IO.Directory.CreateDirectory(directory);
-            }
-
-            var globalStorage = ScriptableObject.CreateInstance<GlobalDataStorage>();
-            
-            AssetDatabase.CreateAsset(globalStorage, fullPath);
-            AssetDatabase.SaveAssets();
-
-            buildPreferencesData.GlobalDataStorage = globalStorage;
         }
     }
 }

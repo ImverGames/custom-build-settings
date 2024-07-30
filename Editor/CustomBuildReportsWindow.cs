@@ -9,7 +9,7 @@ namespace ImverGames.CustomBuildSettings.Editor
 {
     public class CustomBuildReportsWindow : EditorWindow
     {
-        private CustomBuildReport customBuildReport;
+        public static CustomBuildReportsWindow Instance { get; private set; }
 
         private Vector2 lastReportScrollPosition;
         private Vector2 loadedReportScrollPosition;
@@ -19,26 +19,27 @@ namespace ImverGames.CustomBuildSettings.Editor
 
         private bool created;
 
-        private List<SerializableBuildReport> loadedReports;
+        private static List<SerializableBuildReport> loadedReports;
+        private static CustomBuildReport customBuildReport;
 
         private string reportName = "LastBuildReport";
-
-        public void ShowCustomBuildReport()
+        
+        public static CustomBuildReportsWindow CreateOrFocusWindow()
         {
-            var window = GetWindow<CustomBuildReportsWindow>("Custom Build Report");
-            window.minSize = new Vector2(600, 300);
-
+            if (Instance == null)
+            {
+                Instance = GetWindow<CustomBuildReportsWindow>("Custom Build Reports");
+                Instance.minSize = new Vector2(600, 300);
+            }
+            else
+            {
+                Instance.Focus();
+            }
+            
+            customBuildReport = DataBinder.GetData<CustomBuildReport>();
             loadedReports = BuildReportManager.LoadReports();
-        }
 
-        public void Initialize(CustomBuildReport customBuildReport)
-        {
-            this.customBuildReport = customBuildReport;
-        }
-
-        public void SetLastBuildReport(BuildReport buildReport)
-        {
-            customBuildReport.LastBuildReport = buildReport;
+            return Instance;
         }
 
         private void OnGUI()

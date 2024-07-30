@@ -2,8 +2,8 @@
     "name": "ImverGames.CustomBuildSettings.GitPlugin.Editor",
     "rootNamespace": "",
     "references": [
-        "GUID:84fea3b6cd9cf20448a41ed04f9437bd",
-        "GUID:96f974132dde0694ea4426f6c87667fa"
+        "GUID:bd7b0dd43ec2deb4cbca557594fefe31",
+        "GUID:51f5b5e3bdf951545986252501556ea1"
     ],
     "includePlatforms": [
         "Editor"

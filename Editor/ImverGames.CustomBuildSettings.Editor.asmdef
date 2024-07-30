@@ -1,9 +1,11 @@
 {
-    "name": "ImverGames.CustomBuildSettings.Editor",
+    "name": "com.imvergames.custombuildsettings.editor",
     "rootNamespace": "",
     "references": [
-        "GUID:7377ff24c23896e438c65266255602e8",
-        "GUID:926e86b59c3b21247aba7b4e70d372ec"
+        "GUID:84fea3b6cd9cf20448a41ed04f9437bd",
+        "GUID:96f974132dde0694ea4426f6c87667fa",
+        "GUID:bd7b0dd43ec2deb4cbca557594fefe31",
+        "GUID:51f5b5e3bdf951545986252501556ea1"
     ],
     "includePlatforms": [
         "Editor"
@@ -11,9 +13,7 @@
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,
-    "precompiledReferences": [
-        ""
-    ],
+    "precompiledReferences": [],
     "autoReferenced": true,
     "defineConstraints": [],
     "versionDefines": [],

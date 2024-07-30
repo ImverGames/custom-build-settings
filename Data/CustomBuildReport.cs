@@ -4,7 +4,7 @@ using UnityEditor.Build.Reporting;
 
 namespace ImverGames.CustomBuildSettings.Data
 {
-    public class CustomBuildReport
+    public class CustomBuildReport : IBuildData
     {
         public BuildReport LastBuildReport { get; set; }
         public Dictionary<string, List<PackedAssetInfo>> AssetsByCategory { get; set; }
@@ -104,6 +104,16 @@ namespace ImverGames.CustomBuildSettings.Data
                 len = len / 1024;
             }
             return $"{len:0.##} {sizes[order]}";
+        }
+
+        public void Clear()
+        {
+            LastBuildReport = null;
+            AssetsByCategory.Clear();
+            Foldouts.Clear();
+            CategorySizes.Clear();
+            CurrentPage.Clear();
+            LoadedAssetsByCategory.Clear();
         }
     }
 }

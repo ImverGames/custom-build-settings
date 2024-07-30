@@ -8,13 +8,13 @@ namespace ImverGames.CustomBuildSettings.Cheats.Editor
     [PluginOrder(3, "Cheats/CheatsPlugin")]
     public class CheatsPluginEditor : IBuildPluginEditor
     {
-        private BuildDataProvider buildDataProvider;
+        private MainBuildData mainBuildData;
         
         private BuildValue<bool> useCheats;
 
-        public void InvokeSetupPlugin(BuildDataProvider buildDataProvider)
+        public void InvokeSetupPlugin()
         {
-            this.buildDataProvider = buildDataProvider;
+            mainBuildData = DataBinder.GetData<MainBuildData>();
 
             useCheats = new BuildValue<bool>();
 

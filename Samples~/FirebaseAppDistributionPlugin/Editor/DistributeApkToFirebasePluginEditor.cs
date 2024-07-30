@@ -6,16 +6,18 @@ using ImverGames.CustomBuildSettings.Data;
 using ImverGames.CustomBuildSettings.Invoker;
 using UnityEditor;
 using UnityEngine;
+using Debug = UnityEngine.Debug;
 
 namespace ImverGames.CustomBuildSettings.DistributeToFirebase.Editor
 {
     [PluginOrder(3, "Distribute/Distribute Apk To Firebase Plugin")]
     public class DistributeApkToFirebasePluginEditor : IBuildPluginEditor
     {
-        private BuildDataProvider buildDataProvider;
-        private DistributeApkData distributeApkData;
-        private DistributeData distributeData;
-        private DistributeLogger distributeLogger;
+        private GlobalDataStorage globalDataStorage;
+        private MainBuildData mainBuildData;
+        private GitAssistant gitAssistant;
+        private DistributeToFirebasePluginData distributeToFirebasePluginData;
+        private DistributeNotesGitLogger distributeNotesGitLogger;
 
         private BuildValue<ETestersGroup> testersGroup;
         private BuildValue<bool> uploadAutomatically;
@@ -42,9 +44,11 @@ namespace ImverGames.CustomBuildSettings.DistributeToFirebase.Editor
         
         private CancellationTokenSource cancellationTokenSource;
 
-        public void InvokeSetupPlugin(BuildDataProvider buildDataProvider)
+        public void InvokeSetupPlugin()
         {
-            this.buildDataProvider = buildDataProvider;
+            mainBuildData = DataBinder.GetData<MainBuildData>();
+            globalDataStorage = DataBinder.GetData<GlobalDataStorage>();
+            gitAssistant = DataBinder.GetData<GitAssistant>();
 
             testersGroup = new BuildValue<ETestersGroup>();
             uploadAutomatically = new BuildValue<bool>();
@@ -57,7 +61,7 @@ namespace ImverGames.CustomBuildSettings.DistributeToFirebase.Editor
             testersGroup.OnValueChanged += TestersGroupOnOnValueChanged;
             uploadAutomatically.OnValueChanged += UploadAutomaticallyOnOnValueChanged;
             useGitLogger.OnValueChanged += UseGitLoggerOnOnValueChanged;
-            buildDataProvider.SelectedBuildType.OnValueChanged += SelectedBuildTypeOnOnValueChanged;
+            mainBuildData.SelectedBuildType.OnValueChanged += SelectedBuildTypeOnOnValueChanged;
             
             EditorApplication.update += AnimateLoadingText;
 
@@ -73,75 +77,60 @@ namespace ImverGames.CustomBuildSettings.DistributeToFirebase.Editor
 
         private void SaveLoadData()
         {
-            if (!buildDataProvider.BuildPreferencesData.GlobalDataStorage.TryGetPluginData<DistributeApkData>(
-                    out distributeApkData))
-            {
-                distributeApkData = new DistributeApkData();
-
-                if (!distributeApkData.TryGetData(buildDataProvider.SelectedBuildType.Value, out distributeData))
-                    distributeData = distributeApkData.RegisterOrUpdateData(buildDataProvider.SelectedBuildType.Value,
-                        new DistributeData() { BuildType = buildDataProvider.SelectedBuildType.Value });
-
-                distributeApkData =
-                    buildDataProvider.BuildPreferencesData.GlobalDataStorage.SaveOrUpdatePluginData(distributeApkData);
-            }
+            if (!globalDataStorage.TryGetPluginData<DistributeToFirebasePluginData>(GetType(), mainBuildData.SelectedBuildType.Value, out distributeToFirebasePluginData))
+                distributeToFirebasePluginData = globalDataStorage.RegisterOrUpdatePluginData(this.GetType(), mainBuildData.SelectedBuildType.Value,
+                    new DistributeToFirebasePluginData());
             
-            distributeLogger = distributeApkData.DistributeLogger;
+            if (globalDataStorage.TryGetStorage(GetType(), out var storage))
+                distributeNotesGitLogger = storage.SharedBuildTypePluginData as DistributeNotesGitLogger ?? new DistributeNotesGitLogger();
+            
+            globalDataStorage.RegisterOrUpdateStorage(GetType(), storage);
 
-            if (distributeApkData.TryGetData(buildDataProvider.SelectedBuildType.Value, out distributeData))
-            {
-                testersGroup.Value = distributeData.TestersGroup;
-                uploadAutomatically.Value = distributeData.UploadAutomatically;
-                useGitLogger.Value = distributeData.UseGitLogger;
-            }
+            testersGroup.Value = distributeToFirebasePluginData.TestersGroup;
+            uploadAutomatically.Value = distributeToFirebasePluginData.UploadAutomatically;
+            useGitLogger.Value = distributeToFirebasePluginData.UseGitLogger;
         }
 
         private void SelectedBuildTypeOnOnValueChanged(EBuildType obj)
         {
-            if (!distributeApkData.TryGetData(obj, out distributeData))
-                distributeData = distributeApkData.RegisterOrUpdateData(obj, new DistributeData() { BuildType = obj });
+            if (!globalDataStorage.TryGetPluginData<DistributeToFirebasePluginData>(this.GetType(), mainBuildData.SelectedBuildType.Value, out distributeToFirebasePluginData))
+                distributeToFirebasePluginData = globalDataStorage.RegisterOrUpdatePluginData(this.GetType(), mainBuildData.SelectedBuildType.Value,
+                    new DistributeToFirebasePluginData());
                 
-            testersGroup.Value = distributeData.TestersGroup;
-            uploadAutomatically.Value = distributeData.UploadAutomatically;
-            useGitLogger.Value = distributeData.UseGitLogger;
+            testersGroup.Value = distributeToFirebasePluginData.TestersGroup;
+            uploadAutomatically.Value = distributeToFirebasePluginData.UploadAutomatically;
+            useGitLogger.Value = distributeToFirebasePluginData.UseGitLogger;
         }
 
         private void UploadAutomaticallyOnOnValueChanged(bool obj)
         {
-            if (distributeApkData.TryGetData(buildDataProvider.SelectedBuildType.Value, out var data))
+            if (globalDataStorage.TryGetPluginData<DistributeToFirebasePluginData>(this.GetType(), mainBuildData.SelectedBuildType.Value, out var data))
             {
-                data.BuildType = buildDataProvider.SelectedBuildType.Value;
                 data.UploadAutomatically = uploadAutomatically.Value;
-
-                distributeApkData.RegisterOrUpdateData(buildDataProvider.SelectedBuildType.Value, data);
+                
+                globalDataStorage.RegisterOrUpdatePluginData(this.GetType(), mainBuildData.SelectedBuildType.Value, data);
             }
-
-            buildDataProvider.BuildPreferencesData.GlobalDataStorage.SaveOrUpdatePluginData(distributeApkData);
         }
 
         private void TestersGroupOnOnValueChanged(ETestersGroup obj)
         {
-            if (distributeApkData.TryGetData(buildDataProvider.SelectedBuildType.Value, out var data))
+            if (globalDataStorage.TryGetPluginData<DistributeToFirebasePluginData>(this.GetType(), mainBuildData.SelectedBuildType.Value, out var data))
             {
                 data.TestersGroup = testersGroup.Value;
                 data.DistributionGroups = GetGroupsCommandPart(testersGroup.Value);
 
-                distributeApkData.RegisterOrUpdateData(buildDataProvider.SelectedBuildType.Value, data);
+                globalDataStorage.RegisterOrUpdatePluginData(this.GetType(), mainBuildData.SelectedBuildType.Value, data);
             }
-
-            buildDataProvider.BuildPreferencesData.GlobalDataStorage.SaveOrUpdatePluginData(distributeApkData);
         }
         
         private void UseGitLoggerOnOnValueChanged(bool obj)
         {
-            if (distributeApkData.TryGetData(buildDataProvider.SelectedBuildType.Value, out var data))
+            if (globalDataStorage.TryGetPluginData<DistributeToFirebasePluginData>(this.GetType(), mainBuildData.SelectedBuildType.Value, out var data))
             {
                 data.UseGitLogger = obj;
 
-                distributeApkData.RegisterOrUpdateData(buildDataProvider.SelectedBuildType.Value, data);
+                globalDataStorage.RegisterOrUpdatePluginData(this.GetType(), mainBuildData.SelectedBuildType.Value, data);
             }
-
-            buildDataProvider.BuildPreferencesData.GlobalDataStorage.SaveOrUpdatePluginData(distributeApkData);
         }
 
         string GetGroupsCommandPart(ETestersGroup groups)
@@ -199,11 +188,11 @@ namespace ImverGames.CustomBuildSettings.DistributeToFirebase.Editor
             }
             else
             {
-                if (!string.IsNullOrEmpty(buildDataProvider.BuildPath))
+                if (!string.IsNullOrEmpty(mainBuildData.BuildPath))
                 {
-                    buildPath = buildDataProvider.BuildPath;
+                    buildPath = mainBuildData.BuildPath;
                     
-                    GUILayout.Label("Build path: " + buildDataProvider.BuildPath);
+                    GUILayout.Label("Build path: " + mainBuildData.BuildPath);
                 }
             }
             GUILayout.Space(10);
@@ -236,10 +225,10 @@ namespace ImverGames.CustomBuildSettings.DistributeToFirebase.Editor
                 if (GUILayout.Button("Clear Notes", EditorStyles.miniButton))
                     releaseNotes = string.Empty;
 
-                if (distributeLogger.HasData)
+                if (distributeNotesGitLogger.HasData)
                 {
                     if (GUILayout.Button("Save Notes", EditorStyles.miniButton))
-                        distributeLogger.SaveToTextFile();
+                        distributeNotesGitLogger.SaveToTextFile();
                 }
 
                 GUILayout.EndHorizontal();
@@ -267,7 +256,7 @@ namespace ImverGames.CustomBuildSettings.DistributeToFirebase.Editor
             var menu = new GenericMenu();
 
             menu.AddItem(new GUIContent("Get New Notes"), false, () => GetCommitsWithMessageTag(tag));
-            menu.AddItem(new GUIContent("Get All Notes"), false, () => distributeLogger.TryGetNotes(tag, out releaseNotes));
+            menu.AddItem(new GUIContent("Get All Notes"), false, () => GetAllCommitsWithMessageTag(tag));
 
             menu.ShowAsContext();
         }
@@ -278,16 +267,41 @@ namespace ImverGames.CustomBuildSettings.DistributeToFirebase.Editor
             releaseNotes = string.Empty;
             var notes = await GetCommitsWithMessageTagAsync(tag);
             
-            distributeLogger.AddOrUpdateData(tag, notes, out releaseNotes);
+            distributeNotesGitLogger.AddOrUpdateData(tag, notes, out releaseNotes);
+
+            SaveStorage();
+
+            processing = false;
+        }
+
+        private void SaveStorage()
+        {
+            if (globalDataStorage.TryGetStorage(GetType(), out var storage))
+            {
+                storage.SharedBuildTypePluginData = distributeNotesGitLogger;
+                globalDataStorage.RegisterOrUpdateStorage(GetType(), storage);
+            }
+        }
+
+        private async void GetAllCommitsWithMessageTag(string tag)
+        {
+            processing = true;
+            releaseNotes = string.Empty;
+            var notes = await GetCommitsWithMessageTagAsync(tag);
             
-            buildDataProvider.BuildPreferencesData.GlobalDataStorage.SaveOrUpdatePluginData(distributeApkData);
+            distributeNotesGitLogger.AddOrUpdateData(tag, notes, out var newNotes);
+            
+            distributeNotesGitLogger.TryGetNotes(tag, out releaseNotes);
+
+            SaveStorage();
+
             processing = false;
         }
         
         private async Task<string> GetCommitsWithMessageTagAsync(string tag)
         {
             string command = $"log --grep=\"{tag}\" -i --pretty=format:\"%h - %s\"";
-            return await buildDataProvider.GitAssistant.ExecuteGitCommandAsync(command);
+            return await gitAssistant.ExecuteGitCommandAsync(command);
         }
 
         public void InvokeBeforeBuild()
@@ -306,14 +320,14 @@ namespace ImverGames.CustomBuildSettings.DistributeToFirebase.Editor
             if (string.IsNullOrEmpty(buildPath)) return;
             if (string.IsNullOrEmpty(firebaseAppId)) return;
             if (string.IsNullOrEmpty(firebaseToken)) return;
-            if (string.IsNullOrEmpty(distributeData.DistributionGroups)) return;
+            if (string.IsNullOrEmpty(distributeToFirebasePluginData.DistributionGroups)) return;
             
             var notes = releaseNotes.Replace("\\", "\\\\")
                 .Replace("\"", "\\\"")
                 .Replace("\n", "\\n");
 
             string command =
-                $"firebase appdistribution:distribute \"{buildPath}\" --app \"{firebaseAppId}\" --release-notes \"{notes}\" --groups {distributeData.DistributionGroups} --token \"{firebaseToken}\"";
+                $"firebase appdistribution:distribute \"{buildPath}\" --app \"{firebaseAppId}\" --release-notes \"{notes}\" --groups {distributeToFirebasePluginData.DistributionGroups} --token \"{firebaseToken}\"";
 
             var output = await ExecuteFirebaseCommandAsync(command);
             OutputMessage(output.OutputMessage, output.MessageType);
@@ -393,18 +407,32 @@ namespace ImverGames.CustomBuildSettings.DistributeToFirebase.Editor
                     }
 
                     process.Close();
-                    tokenSource?.Dispose();
                 };
 
                 cancellationTokenSource.Token.Register(() =>
                 {
-                    tokenSource?.Cancel();
-                    tokenSource?.Dispose();
+                    try
+                    {
+                        tokenSource?.Cancel();
+                        tokenSource?.Dispose();
+                    }
+                    catch (ObjectDisposedException)
+                    {
+                        // ignored
+                    }
                 });
                 
                 tokenSource.Token.Register(() =>
                 {
-                    process.Kill();
+                    try
+                    {
+                        process.Kill();
+                        Debug.Log("Firebase command was killed.");
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        // ignored
+                    }
                 });
 
                 try
@@ -437,18 +465,17 @@ namespace ImverGames.CustomBuildSettings.DistributeToFirebase.Editor
             testersGroup.OnValueChanged -= TestersGroupOnOnValueChanged;
             uploadAutomatically.OnValueChanged -= UploadAutomaticallyOnOnValueChanged;
             useGitLogger.OnValueChanged -= UseGitLoggerOnOnValueChanged;
-            buildDataProvider.SelectedBuildType.OnValueChanged -= SelectedBuildTypeOnOnValueChanged;
+            mainBuildData.SelectedBuildType.OnValueChanged -= SelectedBuildTypeOnOnValueChanged;
             
             EditorApplication.update -= AnimateLoadingText;
             
             cancellationTokenSource?.Cancel();
             cancellationTokenSource?.Dispose();
             
-            distributeApkData = null;
-            distributeData = null;
+            distributeToFirebasePluginData = null;
             testersGroup = null;
             uploadAutomatically = null;
-            distributeLogger = null;
+            distributeNotesGitLogger = null;
 
             firebaseAppId = string.Empty;
             firebaseToken = string.Empty;

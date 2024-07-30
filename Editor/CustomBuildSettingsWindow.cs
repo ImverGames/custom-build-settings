@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 using ImverGames.BuildIncrementor.Editor;
 using ImverGames.CustomBuildSettings.Data;
 using ImverGames.CustomBuildSettings.Invoker;
@@ -12,29 +13,44 @@ using UnityEditorInternal;
 using UnityEngine;
 using Debug = UnityEngine.Debug;
 using Object = UnityEngine.Object;
+using Random = UnityEngine.Random;
 
 namespace ImverGames.CustomBuildSettings.Editor
 {
     public class CustomBuildSettingsWindow : EditorWindow
     {
-        private CustomBuildPreferencesWindow customBuildPreferences;
-        private BuildDataProvider buildDataProvider;
-        private CustomBuildReport customBuildReport;
-        private CustomBuildReportsWindow customBuildReportsWindow;
+        private DataBinderFactory dataBinderFactory;
 
+        private MainBuildData mainBuildData;
+        private BuildPreferencesData buildPreferencesData;
+        private CustomBuildReport customBuildReport;
         private GitAssistant gitAssistant;
         private GlobalDataStorage globalDataStorage;
-        
+
         private Vector2 pageScrollPosition;
         private Vector2 sceneScrollPosition;
 
         private ReorderableList reorderableList;
-        private List<EditorBuildSettingsScene> scenes;
 
         private bool formatChange;
         private bool expandChange;
 
         private GUIStyle centeredLabelStyle;
+        private GUIStyle headerBoxStyle;
+        private GUIStyle BGStyle;
+        private GUIContent sceneDropGUIContent;
+        private GUIContent copyIconGUIContent;
+        private GUIContent gitIconGUIContent;
+        private GUIContent gitPullIconGUIContent;
+        private GUIContent gitCommitIconGUIContent;
+        private GUIContent headerGUIContent;
+        
+        private float gitIconTextOffset = 0f;
+        private float gitPullIconTextOffset = 0f;
+        private float gitCommitIconTextOffset = 0f;
+        
+        private double time = 0;
+        private Color lineColor;
 
         [MenuItem("File/Custom Build Settings &b")]
         public static void ShowWindow()
@@ -43,195 +59,155 @@ namespace ImverGames.CustomBuildSettings.Editor
             window.minSize = new Vector2(600, 300);
         }
 
-        private void OnEnable()
+        private async void OnEnable()
         {
-            customBuildPreferences = EditorWindow.CreateInstance<CustomBuildPreferencesWindow>();
-            customBuildReportsWindow = EditorWindow.CreateInstance<CustomBuildReportsWindow>();
-            buildDataProvider = new BuildDataProvider();
-            customBuildReport = new CustomBuildReport();
+            InitializeComponents();
+            RegisterDataBinders();
 
-            gitAssistant = buildDataProvider.GitAssistant;
+            await UpdateBuildDataAndUI();
             
-            customBuildReportsWindow.Initialize(customBuildReport);
-            customBuildPreferences.Initialize(buildDataProvider.BuildPreferencesData);
-
-            globalDataStorage = buildDataProvider.BuildPreferencesData.GlobalDataStorage;
-            
-            LoadScenes();
             SetupReorderableList();
 
-            if (!globalDataStorage.TryGetPluginData<CustomBuildData>(out var buildData))
-                buildData = globalDataStorage.SaveOrUpdatePluginData(new CustomBuildData(buildDataProvider.SelectedBuildType.Value));
-            
-            buildDataProvider.Version.Value = buildData.GetBuildVersion(buildData.BuildType);
-            buildDataProvider.VersionTag.Value = buildData.GetBuildVersionTag(buildData.BuildType);
-            buildDataProvider.VersionMeta.Value = buildData.GetBuildVersionMeta(buildData.BuildType);
-            buildDataProvider.VersionFormat.Value = GetFormatTypeFromString(buildDataProvider.Version.Value);
-            buildDataProvider.AddHashToVersion.Value = buildData.GetHashMeta(buildData.BuildType);
-            buildDataProvider.SelectedBuildType.Value = buildData.BuildType;
-
-            buildDataProvider.SelectedBuildType.OnValueChanged += OnChangeBuildTypeSettings;
-            buildDataProvider.Version.OnValueChanged += OnChangeVersion;
-            buildDataProvider.VersionFormat.OnValueChanged += OnChangeVersionFormat;
-            buildDataProvider.VersionMeta.OnValueChanged += VersionMetaOnOnValueChanged;
+            SubscribeToEvents();
 
             EnablePlugins();
+
+            InitializeGUIContents();
+
+            await gitAssistant.CheckAndUpdateGitInfo(this);
+        }
+
+        private async void OnFocus()
+        {
+            if (mainBuildData != null)
+                await UpdateBuildDataAndUI();
+
+            InvokeEditorPluginsOnFocus();
+
+            if(gitAssistant != null)
+                await gitAssistant.CheckAndUpdateGitInfo(this);
+        }
+
+        private void InitializeComponents()
+        {
+            dataBinderFactory = new DataBinderFactory();
+            mainBuildData = new MainBuildData();
+            customBuildReport = new CustomBuildReport();
+            buildPreferencesData = new BuildPreferencesData();
+            gitAssistant = new GitAssistant();
+        }
+
+        private void RegisterDataBinders()
+        {
+            dataBinderFactory.CreateDataBinder();
+            dataBinderFactory
+                .RegisterData(mainBuildData)
+                .RegisterData(customBuildReport)
+                .RegisterData(buildPreferencesData)
+                .RegisterData(gitAssistant)
+                .RegisterData(buildPreferencesData.GlobalDataStorage);
+
+            globalDataStorage = DataBinder.GetData<GlobalDataStorage>();
+        }
+
+        private async Task UpdateBuildDataAndUI()
+        {
+            if (!globalDataStorage.TryGetMainData(globalDataStorage.CustomBuildData.BuildType, out var buildData))
+                buildData = globalDataStorage.RegisterOrUpdateMainData(mainBuildData.SelectedBuildType.Value,
+                    new BuildTypeVersion(mainBuildData.SelectedBuildType.Value));
+
+            mainBuildData.Version.Value = buildData.Version;
+            mainBuildData.VersionTag.Value = buildData.VersionTag;
+            mainBuildData.VersionMeta.Value = buildData.VersionMeta;
+            mainBuildData.AddHashToVersion.Value = buildData.AddHash;
+            mainBuildData.SelectedBuildType.Value = buildData.BuildType;
+            mainBuildData.SetSceneList(buildData.Scenes);
+
+            if (mainBuildData.Scenes == null || mainBuildData.Scenes.Count == 0)
+            {
+                LoadScenes();
+                buildData.Scenes = mainBuildData.GetSceneList();
+                globalDataStorage.RegisterOrUpdateMainData(mainBuildData.SelectedBuildType.Value, buildData);
+            }
             
-            buildDataProvider.GitAssistant.CheckAndUpdateGitInfo(this);
-            
+            SetupReorderableList();
+        }
+
+        private void SubscribeToEvents()
+        {
+            mainBuildData.SelectedBuildType.OnValueChanged += OnChangeBuildTypeSettings;
             EditorApplication.update += OnUpdate;
         }
 
-        private void SaveBuildData()
+        private void InitializeGUIContents()
         {
-            var globalDataStorage = buildDataProvider.BuildPreferencesData.GlobalDataStorage;
-
-            if (globalDataStorage.TryGetPluginData<CustomBuildData>(out var buildData))
-            {
-                buildData.BuildType = buildDataProvider.SelectedBuildType.Value;
-
-                buildData.RegisterOrUpdateVersion(
-                    buildDataProvider.SelectedBuildType.Value,
-                    buildDataProvider.Version.Value,
-                    buildDataProvider.VersionTag.Value,
-                    buildDataProvider.VersionMeta.Value,
-                    buildDataProvider.AddHashToVersion.Value);
-
-                globalDataStorage.SaveOrUpdatePluginData(buildData);
-
-                PlayerSettings.bundleVersion = buildData.GetFullBuildVersion(buildData.BuildType);
-            }
+            sceneDropGUIContent = ResourceManager.GetContentWithTitle("DropArea", "Drag scene here to add to list");
+            copyIconGUIContent = ResourceManager.GetContentWithTooltip("Copy", "Copy and select path");
+            gitIconGUIContent = ResourceManager.GetContentWithTitle("Git", "");
+            gitPullIconGUIContent = ResourceManager.GetContentWithTitle("GitPull", "");
+            gitCommitIconGUIContent = ResourceManager.GetContentWithTitle("GitCommit", "");
+            headerGUIContent = new GUIContent("");
         }
-
-        private void OnFocus()
-        {
-            if (buildDataProvider != null)
-            {
-                buildDataProvider.GitAssistant.CheckAndUpdateGitInfo(this);
-            
-                var globalDataStorage = buildDataProvider.BuildPreferencesData.GlobalDataStorage;
-                globalDataStorage.TryGetPluginData<CustomBuildData>(out var buildData);
-                
-                buildDataProvider.Version.Value = buildData.GetBuildVersion(buildData.BuildType);
-                buildDataProvider.VersionTag.Value = buildData.GetBuildVersionTag(buildData.BuildType);
-                buildDataProvider.VersionMeta.Value = buildData.GetBuildVersionMeta(buildData.BuildType);
-                buildDataProvider.VersionFormat.Value = GetFormatTypeFromString(buildDataProvider.Version.Value);
-                buildDataProvider.AddHashToVersion.Value = buildData.GetHashMeta(buildData.BuildType);
-                buildDataProvider.SelectedBuildType.Value = buildData.BuildType;
-            }
-
-            if (globalDataStorage.editorPlugins != null)
-            {
-                foreach (var editorPlugin in globalDataStorage.editorPlugins)
-                    editorPlugin.BuildPluginEditor.InvokeOnFocusPlugin();
-            }
-            
-            if(customBuildReportsWindow != null)
-                customBuildReportsWindow.Initialize(customBuildReport);
-            else
-            {
-                customBuildReportsWindow = new CustomBuildReportsWindow();
-                customBuildReportsWindow.Initialize(customBuildReport);
-            }
-        }
-
+        
         private void EnablePlugins()
         {
             foreach (var editorPlugin in globalDataStorage.editorPlugins)
-                editorPlugin.BuildPluginEditor.InvokeSetupPlugin(buildDataProvider);
+                editorPlugin.BuildPluginEditor.InvokeSetupPlugin();
         }
 
-        #region BuildVersion Formating
-
-        public static EVersionFormatType GetFormatTypeFromString(string versionString)
+        private void InvokeEditorPluginsOnFocus()
         {
-            var parts = versionString.Split('.');
+            if (globalDataStorage.editorPlugins == null) return;
 
-            if (parts.Length != 3 || string.IsNullOrEmpty(versionString)) return default;
-
-            int length1 = parts[0].Length;
-            int length2 = parts[1].Length;
-            int length3 = parts[2].Length;
-
-            if (length1 == 1 && length2 == 1 && length3 == 1) return EVersionFormatType.D1_D1_D1;
-            if (length1 == 1 && length2 == 1 && length3 == 2) return EVersionFormatType.D1_D1_D2;
-            if (length1 == 1 && length2 == 1 && length3 == 3) return EVersionFormatType.D1_D1_D3;
-            if (length1 == 1 && length2 == 1 && length3 == 3) return EVersionFormatType.D1_D2_D2;
-            if (length1 == 1 && length2 == 2 && length3 == 3) return EVersionFormatType.D1_D2_D3;
-            if (length1 == 1 && length2 == 3 && length3 == 3) return EVersionFormatType.D1_D3_D3;
-            if (length1 == 2 && length2 == 2 && length3 == 3) return EVersionFormatType.D2_D2_D3;
-            if (length1 == 2 && length2 == 3 && length3 == 3) return EVersionFormatType.D2_D3_D3;
-            
-            return default;
+            foreach (var editorPlugin in globalDataStorage.editorPlugins)
+                editorPlugin.BuildPluginEditor.InvokeOnFocusPlugin();
         }
-        
-        public static string ConvertVersionFormat(string version, EVersionFormatType newFormat)
-        {
-            var parts = version.Split('.');
-            
-            if (parts.Length != 3) return version;
-
-            int part1 = int.Parse(parts[0]);
-            int part2 = int.Parse(parts[1]);
-            int part3 = int.Parse(parts[2]);
-
-            switch (newFormat)
-            {
-                case EVersionFormatType.D1_D1_D1:
-                    return $"{part1:D1}.{part2:D1}.{part3:D1}";
-                case EVersionFormatType.D1_D1_D2:
-                    return $"{part1:D1}.{part2:D1}.{part3:D2}";
-                case EVersionFormatType.D1_D1_D3:
-                    return $"{part1:D1}.{part2:D1}.{part3:D3}";
-                case EVersionFormatType.D1_D2_D2:
-                    return $"{part1:D1}.{part2:D2}.{part3:D2}";
-                case EVersionFormatType.D1_D2_D3:
-                    return $"{part1:D1}.{part2:D2}.{part3:D3}";
-                case EVersionFormatType.D1_D3_D3:
-                    return $"{part1:D1}.{part2:D3}.{part3:D3}";
-                case EVersionFormatType.D2_D2_D3:
-                    return $"{part1:D2}.{part2:D2}.{part3:D3}";
-                case EVersionFormatType.D2_D3_D3:
-                    return $"{part1:D2}.{part2:D3}.{part3:D3}";
-                
-                default:
-                    return version;
-            }
-        }
-
-        #endregion
 
         private void InitStyles()
         {
-            centeredLabelStyle = GUI.skin.GetStyle("Label");
-            centeredLabelStyle.alignment = TextAnchor.UpperCenter;
-            centeredLabelStyle.fontStyle = FontStyle.Bold;
+            centeredLabelStyle ??= new GUIStyle(GUI.skin.GetStyle("Label"))
+            {
+                alignment = TextAnchor.UpperCenter,
+                fontStyle = FontStyle.Bold,
+                fixedHeight = EditorGUIUtility.singleLineHeight
+            };
+
+            headerBoxStyle ??= new GUIStyle(GUI.skin.box)
+            {
+                normal = new GUIStyleState()
+                {
+                    background = ResourceManager.GetTexture2D("Header")
+                }
+            };
+            
+            BGStyle ??= new GUIStyle(GUI.skin.box)
+            {
+                normal = new GUIStyleState()
+                {
+                    background = ResourceManager.GetTexture2D("BG")
+                }
+            };
         }
 
         void OnGUI()
         {
             InitStyles();
-            
+
             DrawGitInfo();
 
             #region Window scroll
-            
-            pageScrollPosition = 
-                GUILayout.BeginScrollView(
-                    pageScrollPosition,
-                    GUILayout.ExpandWidth(true),
-                    GUILayout.ExpandHeight(true));   //----------------------- Begin Window scroll -----------------------
+
+            pageScrollPosition = GUILayout.BeginScrollView(pageScrollPosition, /*EditorStyles.helpBox,*/ GUILayout.ExpandWidth(true),
+                    GUILayout.ExpandHeight(true)); //----------------------- Begin Window scroll -----------------------
 
             #region Window
 
-            GUILayout.BeginVertical(GUI.skin.box);  //----------------------- Window Vertical -----------------------
+            GUILayout.BeginVertical(); //----------------------- Window Vertical -----------------------
 
-            GUILayout.Space(10);
-            
             Event evt = Event.current;
-            
+
             #region Scene list
-            
+
             DrawSceneManagement(evt);
 
             #endregion
@@ -239,19 +215,19 @@ namespace ImverGames.CustomBuildSettings.Editor
             GUILayout.Space(10);
 
             #region Build option
-            
+
             DrawBuildOption();
 
             #endregion
 
             DrawPluginPage();
 
-            GUILayout.EndVertical();  //----------------------- End Window Vertical -----------------------
-            
+            GUILayout.EndVertical(); //----------------------- End Window Vertical -----------------------
+
             #endregion
-            
-            GUILayout.EndScrollView();   //----------------------- End Window scroll -----------------------
-            
+
+            GUILayout.EndScrollView(); //----------------------- End Window scroll -----------------------
+
             #endregion
 
             GUILayout.Space(10);
@@ -259,7 +235,7 @@ namespace ImverGames.CustomBuildSettings.Editor
             #region Control Buttons
 
             GUILayout.FlexibleSpace();
-            GUILayout.BeginHorizontal();  //----------------------- Control Buttons Horizontal -----------------------
+            GUILayout.BeginHorizontal(); //----------------------- Control Buttons Horizontal -----------------------
 
             if (GUILayout.Button("Open Player Settings", GUILayout.ExpandWidth(false)))
             {
@@ -270,7 +246,7 @@ namespace ImverGames.CustomBuildSettings.Editor
             {
                 GUILayout.FlexibleSpace();
                 if (GUILayout.Button("Show build reports"))
-                    customBuildReportsWindow.ShowCustomBuildReport();
+                    CustomBuildReportsWindow.CreateOrFocusWindow();
             }
 
             GUILayout.FlexibleSpace();
@@ -278,100 +254,131 @@ namespace ImverGames.CustomBuildSettings.Editor
             {
                 ShowDropdownMenu();
             }
-            
-            GUILayout.EndHorizontal();  //----------------------- End Control Buttons Horizontal -----------------------
-            
+
+            GUILayout.EndHorizontal(); //----------------------- End Control Buttons Horizontal -----------------------
+
             #endregion
         }
-        
+
+        private void SaveBuildData()
+        {
+            if (globalDataStorage.TryGetMainData(mainBuildData.SelectedBuildType.Value, out var buildData))
+            {
+                buildData.Version = mainBuildData.Version.Value;
+                buildData.VersionTag = mainBuildData.VersionTag.Value;
+                buildData.VersionMeta = mainBuildData.VersionMeta.Value;
+                buildData.AddHash = mainBuildData.AddHashToVersion.Value;
+
+                globalDataStorage.RegisterOrUpdateMainData(mainBuildData.SelectedBuildType.Value, buildData);
+
+                PlayerSettings.bundleVersion =
+                    globalDataStorage.CustomBuildData.GetFullBuildVersion(mainBuildData.SelectedBuildType.Value);
+            }
+        }
+
         #region Scenes management
 
         private void LoadScenes()
         {
-            scenes = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);
+            mainBuildData.Scenes = new List<EditorBuildSettingsScene>(EditorBuildSettings.scenes);
         }
 
         private void SetupReorderableList()
         {
-            reorderableList = new ReorderableList(scenes, typeof(EditorBuildSettingsScene), true, true, false, true);
+            reorderableList = new ReorderableList(mainBuildData.Scenes, typeof(EditorBuildSettingsScene), true, true, false, true);
+            
+            reorderableList.multiSelect = true;
 
             reorderableList.drawHeaderCallback = (Rect rect) => { EditorGUI.LabelField(rect, "Scenes In Build:"); };
+            reorderableList.elementHeight = EditorGUIUtility.singleLineHeight + 5;
 
             reorderableList.drawElementCallback = (Rect rect, int index, bool isActive, bool isFocused) =>
             {
-                EditorBuildSettingsScene scene = scenes[index];
-                rect.y += 2;
-                rect.height = EditorGUIUtility.singleLineHeight;
+                EditorBuildSettingsScene scene = mainBuildData.Scenes[index];
 
                 var checkBoxWidth = 20;
-                bool newEnabledValue = EditorGUI.Toggle(new Rect(rect.x, rect.y, checkBoxWidth - 2, rect.height), scene.enabled);
+                bool newEnabledValue = EditorGUI.Toggle(new Rect(rect.x, rect.y, checkBoxWidth - 2, rect.height),
+                    scene.enabled);
                 if (newEnabledValue != scene.enabled)
                 {
                     scene.enabled = newEnabledValue;
                     UpdateBuildSettingsScenes();
                 }
 
-                float copyButtonWidth = 15;
+                float copyButtonWidth = 25;
                 float labelWidth = rect.width - 20 - copyButtonWidth;
                 EditorGUI.LabelField(new Rect(rect.x + checkBoxWidth, rect.y, labelWidth, rect.height), scene.path);
 
-                var copyButtonContent = new GUIContent("⁝", "Copy path");
-                
-                if (GUI.Button(new Rect(rect.x + checkBoxWidth + labelWidth, rect.y, copyButtonWidth, rect.height), copyButtonContent))
+                if (GUI.Button(new Rect(rect.x + checkBoxWidth + labelWidth, rect.y, copyButtonWidth, rect.height), copyIconGUIContent))
                 {
                     EditorGUIUtility.systemCopyBuffer = scene.path;
+                    EditorGUIUtility.PingObject(AssetDatabase.LoadAssetAtPath<SceneAsset>(scene.path));
                 }
             };
 
-            reorderableList.onChangedCallback = (ReorderableList list) =>
-            {
-                UpdateBuildSettingsScenes();
-            };
+            reorderableList.onChangedCallback = (ReorderableList list) => UpdateBuildSettingsScenes();
 
             reorderableList.onAddCallback = (ReorderableList list) => { AddOpenScenes(); };
 
             reorderableList.onRemoveCallback = (ReorderableList list) =>
             {
-                scenes.RemoveAt(list.index);
+                mainBuildData.Scenes.RemoveAt(list.index);
                 UpdateBuildSettingsScenes();
             };
+            
+            reorderableList.drawNoneElementCallback = (Rect rect) =>
+            {
+                EditorGUI.LabelField(rect, "No scenes in build");
+            };
+            
+            reorderableList.drawElementBackgroundCallback = (Rect rect, int index, bool isActive, bool isFocused) =>
+            {
+                if (isActive)
+                {
+                    EditorGUI.DrawRect(rect, new Color(0.5f, 0.5f, 0.5f, 0.5f));
+                }
+            };
         }
-        
+
         private void AddOpenScenes()
         {
             foreach (var scene in EditorSceneManager.GetActiveScene().GetRootGameObjects().Select(go => go.scene.path)
                          .Distinct())
             {
-                if (!string.IsNullOrEmpty(scene) && !scenes.Any(s => s.path == scene))
+                if (!string.IsNullOrEmpty(scene) && !mainBuildData.Scenes.Any(s => s.path == scene))
                 {
-                    scenes.Add(new EditorBuildSettingsScene(scene, true));
+                    mainBuildData.Scenes.Add(new EditorBuildSettingsScene(scene, true));
                 }
             }
 
             UpdateBuildSettingsScenes();
         }
-        
+
         private void UpdateBuildSettingsScenes()
         {
-            EditorBuildSettings.scenes = scenes.ToArray();
+            EditorBuildSettings.scenes = mainBuildData.Scenes.ToArray();
             EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
+
+            if (globalDataStorage.TryGetMainData(mainBuildData.SelectedBuildType.Value, out var buildData))
+            {
+                buildData.Scenes = mainBuildData.GetSceneList();
+
+                globalDataStorage.RegisterOrUpdateMainData(mainBuildData.SelectedBuildType.Value, buildData);
+            }
         }
 
         #endregion
 
         #region OnGui Drawers section
 
-        private void DrawDropSceneArea(Event evt)
+        private void DropSceneArea(Event evt)
         {
-            Rect dropArea = GUILayoutUtility.GetRect(0f, 25f, GUILayout.ExpandWidth(true));
-            GUI.Box(dropArea, "Drag scene here to add to list");
+            /*Rect dropArea = GUILayoutUtility.GetRect(0f, 35f, GUILayout.ExpandWidth(true));
+            GUI.Box(dropArea, sceneDropGUIContent, GUI.skin.box);*/
             switch (evt.type)
             {
                 case EventType.DragUpdated:
                 case EventType.DragPerform:
-                    if (!dropArea.Contains(evt.mousePosition))
-                        break;
-
                     DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
                     if (evt.type == EventType.DragPerform)
                     {
@@ -382,21 +389,21 @@ namespace ImverGames.CustomBuildSettings.Editor
                             if (draggedObject is SceneAsset)
                             {
                                 string path = AssetDatabase.GetAssetPath(draggedObject);
-                                if (!scenes.Any(s => s.path == path))
+                                if (!mainBuildData.Scenes.Any(s => s.path == path))
                                 {
-                                    scenes.Add(new EditorBuildSettingsScene(path, true));
+                                    mainBuildData.Scenes.Add(new EditorBuildSettingsScene(path, true));
                                     UpdateBuildSettingsScenes();
                                 }
                             }
                         }
                     }
-
                     break;
             }
         }
+
         private void DrawSceneManagement(Event evt)
         {
-            DrawDropSceneArea(evt);
+            DropSceneArea(evt);
 
             sceneScrollPosition =
                 GUILayout.BeginScrollView(sceneScrollPosition, GUILayout.ExpandWidth(true),
@@ -421,8 +428,8 @@ namespace ImverGames.CustomBuildSettings.Editor
             #region Build Type Management
 
             GUILayout.BeginHorizontal(); //----------------------- Build Type Management Horizontal -----------------------
-            buildDataProvider.SelectedBuildType.Value =
-                (EBuildType)EditorGUILayout.EnumPopup("Build Type", buildDataProvider.SelectedBuildType.Value);
+            mainBuildData.SelectedBuildType.Value =
+                (EBuildType)EditorGUILayout.EnumPopup("Build Type", mainBuildData.SelectedBuildType.Value);
 
             GUILayout.Label($"Platform: {EditorUserBuildSettings.activeBuildTarget}", EditorStyles.boldLabel);
             GUILayout.EndHorizontal(); //----------------------- Build Type Management Horizontal -----------------------
@@ -444,19 +451,20 @@ namespace ImverGames.CustomBuildSettings.Editor
 
             EditorGUI.BeginChangeCheck();
 
-            buildDataProvider.Version.Value = EditorGUILayout.TextField("Build Version:", buildDataProvider.Version.Value);
+            mainBuildData.Version.Value = EditorGUILayout.TextField("Build Version:", mainBuildData.Version.Value);
 
             GUILayout.Label("-", GUILayout.Width(10));
 
-            buildDataProvider.VersionTag.Value =
-                EditorGUILayout.TextField(buildDataProvider.VersionTag.Value, GUILayout.Width(30));
+            mainBuildData.VersionTag.Value =
+                EditorGUILayout.TextField(mainBuildData.VersionTag.Value, GUILayout.Width(30));
 
             DrawVersionGitMeta();
 
             //buildIncrementorData.VersionFormat.Value = (EVersionFormatType)EditorGUILayout.EnumPopup(buildIncrementorData.VersionFormat.Value);
 
             GUILayout.Space(10);
-            buildDataProvider.AddHashToVersion.Value = EditorGUILayout.Toggle("Add commit hash", buildDataProvider.AddHashToVersion.Value);
+            mainBuildData.AddHashToVersion.Value =
+                EditorGUILayout.Toggle("Add commit hash", mainBuildData.AddHashToVersion.Value);
 
             if (EditorGUI.EndChangeCheck())
                 formatChange = true;
@@ -476,35 +484,91 @@ namespace ImverGames.CustomBuildSettings.Editor
 
         private void DrawVersionGitMeta()
         {
-            if (gitAssistant.gitAvailable && buildDataProvider.AddHashToVersion.Value)
+            if (gitAssistant.gitAvailable && mainBuildData.AddHashToVersion.Value)
             {
                 GUILayout.Label(".", GUILayout.Width(8));
 
-                buildDataProvider.VersionMeta.Value = gitAssistant.commitShortHash;
+                mainBuildData.VersionMeta.Value = gitAssistant.commitShortHash;
 
                 GUILayout.Label(new GUIContent(gitAssistant.commitShortHash), GUILayout.Width(55));
             }
-            else if (gitAssistant.gitAvailable && !buildDataProvider.AddHashToVersion.Value)
+            else if (gitAssistant.gitAvailable && !mainBuildData.AddHashToVersion.Value)
             {
-                buildDataProvider.VersionMeta.Value = string.Empty;
+                mainBuildData.VersionMeta.Value = string.Empty;
             }
         }
 
         private void DrawGitInfo()
         {
+            Rect headerRect = GUILayoutUtility.GetRect(0f, 50f, GUILayout.ExpandWidth(true));
+            GUI.Box(headerRect, headerGUIContent, headerBoxStyle);
+
+            GUI.BeginGroup(headerRect);
+
             if (gitAssistant.gitAvailable)
             {
                 if (gitAssistant.isFetching)
                 {
-                    GUILayout.Label(gitAssistant.fetchingText, centeredLabelStyle);
+                    Rect fetchingLabelRect = new Rect(0, (headerRect.height - 20) / 2, headerRect.width, 20);
+                    GUI.Label(fetchingLabelRect, gitAssistant.fetchingText, centeredLabelStyle);
                 }
                 else
                 {
-                    GUILayout.Label(
-                        "Branch: " + gitAssistant.currentBranch + " | " + "↑↓ " + gitAssistant.commitsBehind + " | " + "#" + gitAssistant.commitShortHash,
-                        centeredLabelStyle);
+                    gitIconGUIContent.text = gitAssistant.currentBranch;
+                    gitPullIconGUIContent.text = gitAssistant.commitsBehind;
+                    gitCommitIconGUIContent.text = gitAssistant.commitShortHash;
+
+                    float labelWidth = headerRect.width / 3;
+                    float labelHeight = 20;
+                    float yPos = (headerRect.height - labelHeight) / 2;
+
+                    Rect gitIconRect = new Rect(0, yPos, labelWidth, labelHeight);
+                    Rect gitPullIconRect = new Rect(labelWidth, yPos, labelWidth, labelHeight);
+                    Rect gitCommitIconRect = new Rect(labelWidth * 2, yPos, labelWidth, labelHeight);
+
+                    AnimateLabel(gitIconRect, gitIconGUIContent, centeredLabelStyle, ref gitIconTextOffset);
+                    AnimateLabel(gitPullIconRect, gitPullIconGUIContent, centeredLabelStyle, ref gitPullIconTextOffset);
+                    AnimateLabel(gitCommitIconRect, gitCommitIconGUIContent, centeredLabelStyle, ref gitCommitIconTextOffset);
                 }
             }
+            GUI.EndGroup();
+            
+            if (time % 2 < 0.1f)
+                lineColor = GetRandomColor();
+
+            DrawUILine(Color.Lerp(Color.red, lineColor, Mathf.PingPong((float)time, 1)));
+        }
+        
+        private Color GetRandomColor()
+        {
+            float r = Random.Range(0f, 1f);
+            float g = Random.Range(0f, 1f);
+            float b = Random.Range(0f, 1f);
+
+            return new Color(r, g, b);
+        }
+        
+        private void AnimateLabel(Rect labelRect, GUIContent content, GUIStyle style, ref float textOffset)
+        {
+            float textWidth = style.CalcSize(new GUIContent(content.text)).x;
+            float totalContentWidth = textWidth + style.padding.horizontal;
+
+            GUI.BeginGroup(labelRect);
+            
+            if (totalContentWidth > labelRect.width)
+            {
+                textOffset = Mathf.Repeat((float)time * 20f, totalContentWidth);
+                GUI.BeginClip(new Rect(-textOffset, 0, totalContentWidth + labelRect.width, labelRect.height));
+                GUI.Label(new Rect(0, 0, totalContentWidth, labelRect.height), content, style);
+                GUI.EndClip();
+            }
+            else
+            {
+                textOffset = 0f;
+                GUI.Label(new Rect(0, 0, labelRect.width, labelRect.height), content, style);
+            }
+
+            GUI.EndGroup();
         }
 
         private void ShowDropdownMenu()
@@ -512,11 +576,12 @@ namespace ImverGames.CustomBuildSettings.Editor
             var menu = new GenericMenu();
 
             menu.AddItem(new GUIContent("Build"), false, () => BuildGame(BuildOptions.ShowBuiltPlayer));
-            menu.AddItem(new GUIContent("Clean Build"), false, () => BuildGame(BuildOptions.ShowBuiltPlayer | BuildOptions.CleanBuildCache));
+            menu.AddItem(new GUIContent("Clean Build"), false,
+                () => BuildGame(BuildOptions.ShowBuiltPlayer | BuildOptions.CleanBuildCache));
 
             menu.ShowAsContext();
         }
-        
+
         void DrawUILine(Color color, int thickness = 1, int padding = 10)
         {
             Rect r = EditorGUILayout.GetControlRect(GUILayout.Height(padding + thickness));
@@ -542,7 +607,7 @@ namespace ImverGames.CustomBuildSettings.Editor
                 DrawUILine(Color.gray);
                 GUILayout.BeginVertical(EditorStyles.helpBox);
                 EditorGUILayout.BeginHorizontal("Box");
-                
+
                 EditorGUI.BeginChangeCheck();
                 globalDataStorage.editorPlugins[i].Expand = EditorGUILayout.Foldout(
                     globalDataStorage.editorPlugins[i].Expand,
@@ -552,7 +617,7 @@ namespace ImverGames.CustomBuildSettings.Editor
                 if (expandChange)
                 {
                     EditorUtility.SetDirty(globalDataStorage);
-                    
+
                     expandChange = false;
                 }
 
@@ -561,7 +626,7 @@ namespace ImverGames.CustomBuildSettings.Editor
                     if (GUILayout.Button("↑", GUILayout.MaxWidth(30)))
                     {
                         EditorUtility.SetDirty(globalDataStorage);
-                        
+
                         var item = globalDataStorage.editorPlugins[i];
                         globalDataStorage.editorPlugins.RemoveAt(i);
                         globalDataStorage.editorPlugins.Insert(i - 1, item);
@@ -577,7 +642,7 @@ namespace ImverGames.CustomBuildSettings.Editor
                     if (GUILayout.Button("↓", GUILayout.MaxWidth(30)))
                     {
                         EditorUtility.SetDirty(globalDataStorage);
-                        
+
                         var item = globalDataStorage.editorPlugins[i];
                         globalDataStorage.editorPlugins.RemoveAt(i);
                         globalDataStorage.editorPlugins.Insert(i + 1, item);
@@ -591,13 +656,13 @@ namespace ImverGames.CustomBuildSettings.Editor
                 if (GUILayout.Button("X", GUILayout.MaxWidth(30)))
                 {
                     EditorUtility.SetDirty(globalDataStorage);
-                    
+
                     globalDataStorage.editorPlugins[i].BuildPluginEditor.InvokeDestroyPlugin();
-                    
+
                     globalDataStorage.editorPlugins.RemoveAt(i);
-                    
+
                     EditorGUILayout.EndHorizontal();
-                    
+
                     GUILayout.EndVertical();
 
                     break;
@@ -609,7 +674,7 @@ namespace ImverGames.CustomBuildSettings.Editor
                 {
                     globalDataStorage.editorPlugins[i].BuildPluginEditor.InvokeGUIPlugin();
                 }
-                
+
                 GUILayout.EndVertical();
             }
 
@@ -621,13 +686,13 @@ namespace ImverGames.CustomBuildSettings.Editor
 
             GUILayout.Space(10);
         }
-        
+
         private void ShowAddPluginMenu()
         {
             var menu = new GenericMenu();
-            
+
             Type interfaceType = typeof(IBuildPluginEditor);
-            
+
             foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
             {
                 foreach (var type in assembly.GetTypes())
@@ -635,8 +700,10 @@ namespace ImverGames.CustomBuildSettings.Editor
                     if (interfaceType.IsAssignableFrom(type) && !type.IsInterface && !type.IsAbstract)
                     {
                         var attr = type.GetCustomAttribute<PluginOrderAttribute>();
-                        
-                        string menuItemName = attr != null && !string.IsNullOrEmpty(attr.NamePath) ? attr.NamePath : type.Name;
+
+                        string menuItemName = attr != null && !string.IsNullOrEmpty(attr.NamePath)
+                            ? attr.NamePath
+                            : type.Name;
                         menu.AddItem(new GUIContent(menuItemName), false, () => AddPlugin(type));
                     }
                 }
@@ -644,19 +711,20 @@ namespace ImverGames.CustomBuildSettings.Editor
 
             menu.ShowAsContext();
         }
-        
+
         private void AddPlugin(Type pluginType)
         {
             if (globalDataStorage.editorPlugins.Exists(p => p.BuildPluginEditor.GetType() == pluginType))
                 return;
-            
+
             if (Activator.CreateInstance(pluginType) is IBuildPluginEditor pluginInstance)
             {
                 EditorUtility.SetDirty(globalDataStorage);
-                    
-                pluginInstance.InvokeSetupPlugin(buildDataProvider);
-                
-                globalDataStorage.editorPlugins.Add(new PluginsStorage() {BuildPluginEditor = pluginInstance, Expand = true});
+
+                pluginInstance.InvokeSetupPlugin();
+
+                globalDataStorage.editorPlugins.Add(new PluginsStorage()
+                    { BuildPluginEditor = pluginInstance, Expand = true });
             }
         }
 
@@ -664,71 +732,40 @@ namespace ImverGames.CustomBuildSettings.Editor
 
         #region OValueChange setion
 
-        private void OnChangeVersion(string version)
-        {
-            buildDataProvider.VersionFormat.Value = GetFormatTypeFromString(buildDataProvider.Version.Value);
-        }
-        
-        private void OnChangeVersionFormat(EVersionFormatType eVersionFormatType)
-        {
-            buildDataProvider.Version.Value = ConvertVersionFormat(buildDataProvider.Version.Value, eVersionFormatType);
-        }
-
         private void OnChangeBuildTypeSettings(EBuildType eBuildType)
         {
-            switch (buildDataProvider.SelectedBuildType.Value)
-            {
-                case EBuildType.RELEASE:
-                    break;
-                case EBuildType.MILESTONE:
-                    break;
-                case EBuildType.DAILY:
-                    break;
-                case EBuildType.DEVELOPMENT:
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException();
-            }
+            if (!globalDataStorage.TryGetMainData(eBuildType, out var buildData))
+                buildData = globalDataStorage.RegisterOrUpdateMainData(eBuildType, new BuildTypeVersion(eBuildType));
             
-            var globalDataStorage = buildDataProvider.BuildPreferencesData.GlobalDataStorage;
+            mainBuildData.SelectedBuildType.Value = eBuildType;
+            
+            mainBuildData.Version.Value = buildData.Version;
+            mainBuildData.VersionTag.Value = buildData.VersionTag;
+            mainBuildData.VersionMeta.Value = buildData.VersionMeta;
+            mainBuildData.AddHashToVersion.Value = buildData.AddHash;
+            mainBuildData.SetSceneList(buildData.Scenes);
+            
+            if(mainBuildData.Scenes == null || mainBuildData.Scenes.Count == 0)
+                LoadScenes();
+            
+            globalDataStorage.CustomBuildData.BuildType = eBuildType;
 
-            if (globalDataStorage.TryGetPluginData<CustomBuildData>(out var buildData))
-            {
-                buildDataProvider.Version.Value = buildData.GetBuildVersion(eBuildType);
-                buildDataProvider.VersionTag.Value = buildData.GetBuildVersionTag(eBuildType);
-                buildDataProvider.VersionMeta.Value = buildData.GetBuildVersionMeta(eBuildType);
-                buildDataProvider.AddHashToVersion.Value = buildData.GetHashMeta(eBuildType);
-                
-                buildData.BuildType = eBuildType;
-                        
-                buildData.RegisterOrUpdateVersion(
-                    eBuildType,
-                    buildDataProvider.Version.Value,
-                    buildDataProvider.VersionTag.Value, 
-                    buildDataProvider.VersionMeta.Value,
-                    buildDataProvider.AddHashToVersion.Value);
-
-                globalDataStorage.SaveOrUpdatePluginData(buildData);
-                
-                PlayerSettings.bundleVersion = buildData.GetFullBuildVersion(eBuildType);
-            }
-        }
-        
-        private void VersionMetaOnOnValueChanged(string meta)
-        {
-            SaveBuildData();
+            SetupReorderableList();
+            UpdateBuildSettingsScenes();
+            
+            PlayerSettings.bundleVersion = globalDataStorage.CustomBuildData.GetFullBuildVersion(eBuildType);
         }
 
         #endregion
 
         #region Build section
-        
+
         private void InvokePluginBeforeBuild()
         {
             foreach (var editorPlugin in globalDataStorage.editorPlugins)
                 editorPlugin.BuildPluginEditor.InvokeBeforeBuild();
         }
-        
+
         private void InvokePluginAfterBuild()
         {
             foreach (var editorPlugin in globalDataStorage.editorPlugins)
@@ -738,20 +775,19 @@ namespace ImverGames.CustomBuildSettings.Editor
         private void BuildGame(BuildOptions options)
         {
             string extension = GetExtensionForTarget(EditorUserBuildSettings.activeBuildTarget);
-            string defaultName = $"{Application.productName}_{buildDataProvider.SelectedBuildType.Value}{extension}";
-            string path = EditorUtility.SaveFilePanel("Choose Location and Name for Build", "", defaultName, extension.Replace(".", ""));
+            string defaultName = $"{Application.productName}_{mainBuildData.SelectedBuildType.Value}{extension}";
+            string path = EditorUtility.SaveFilePanel("Choose Location and Name for Build", "", defaultName,
+                extension.Replace(".", ""));
 
             if (string.IsNullOrEmpty(path)) return;
-            
-            buildDataProvider.BuildPath = path;
+
+            mainBuildData.BuildPath = path;
 
             InvokePluginBeforeBuild();
-            
-            IncrementBuildVersion();
 
             BuildPlayerOptions buildPlayerOptions = new BuildPlayerOptions
             {
-                scenes = scenes.Where(s => s.enabled).Select(s => s.path).ToArray(),
+                scenes = mainBuildData.Scenes.Where(s => s.enabled).Select(s => s.path).ToArray(),
                 locationPathName = path,
                 target = EditorUserBuildSettings.activeBuildTarget,
                 options = options,
@@ -765,32 +801,18 @@ namespace ImverGames.CustomBuildSettings.Editor
             BuildReport report = BuildPipeline.BuildPlayer(buildPlayerOptions);
             BuildSummary summary = report.summary;
 
-            customBuildReportsWindow.SetLastBuildReport(report);
+            customBuildReport.LastBuildReport = report;
 
             if (summary.result == BuildResult.Succeeded)
             {
-                Debug.Log($"Build succeeded: {summary.totalSize} bytes at path {summary.outputPath}");
+                Debug.Log($"[CBS]: Build succeeded: {summary.totalSize} bytes at path {summary.outputPath}");
 
                 InvokePluginAfterBuild();
             }
             else if (summary.result == BuildResult.Failed)
             {
-                Debug.LogError("Build failed");
+                Debug.LogError($"[CBS]: Build failed: {summary.totalErrors} errors, {summary.totalWarnings} warnings");
             }
-        }
-
-        private void IncrementBuildVersion(bool refresh = false)
-        {
-            /*BuildTypeVersionIncrementor.IncrementVersion(buildIncrementorData, out var buildData,
-                buildIncrementorData.Version.Value,
-                Enum.GetName(typeof(EVersionFormatType), buildIncrementorData.VersionFormat.Value));
-
-            buildIncrementorData.Version.Value = buildData.GetBuildVersion(buildIncrementorData.SelectedBuildType.Value);
-
-            if (refresh)
-            {
-                AssetDatabase.Refresh();
-            }*/
         }
 
         private string GetExtensionForTarget(BuildTarget target)
@@ -816,16 +838,17 @@ namespace ImverGames.CustomBuildSettings.Editor
                     return "";
             }
         }
-        
+
         #endregion
-        
+
         private void OnUpdate()
         {
+            time = EditorApplication.timeSinceStartup;
+            
             if (gitAssistant.gitAvailable && gitAssistant.isFetching)
-            {
                 gitAssistant.AnimateLoadingText();
-                Repaint();
-            }
+            
+            Repaint();
         }
 
         private void OnLostFocus()
@@ -835,30 +858,24 @@ namespace ImverGames.CustomBuildSettings.Editor
 
         private void OnDestroy()
         {
+            CustomBuildPreferencesWindow.Instance?.Close();
+            CustomBuildReportsWindow.Instance?.Close();
+
             AssetDatabase.SaveAssetIfDirty(globalDataStorage);
-            
-            buildDataProvider.SelectedBuildType.OnValueChanged -= OnChangeBuildTypeSettings;
-            buildDataProvider.Version.OnValueChanged -= OnChangeVersion;
-            buildDataProvider.VersionFormat.OnValueChanged -= OnChangeVersionFormat;
-            buildDataProvider.VersionMeta.OnValueChanged -= VersionMetaOnOnValueChanged;
-            
+
+            mainBuildData.SelectedBuildType.OnValueChanged -= OnChangeBuildTypeSettings;
+
             EditorApplication.update -= OnUpdate;
 
             foreach (var editorPlugin in globalDataStorage.editorPlugins)
                 editorPlugin.BuildPluginEditor.InvokeDestroyPlugin();
-            
-            buildDataProvider.GitAssistant.Dispose();
+
+            gitAssistant.Dispose();
+            dataBinderFactory.Cleanup();
 
             gitAssistant = null;
-            buildDataProvider = null;
+            mainBuildData = null;
             reorderableList = null;
-            scenes = null;
-            
-            if(customBuildPreferences != null)
-                DestroyImmediate(customBuildPreferences);
-            
-            if(customBuildReportsWindow != null)
-                DestroyImmediate(customBuildReportsWindow);
         }
     }
 }

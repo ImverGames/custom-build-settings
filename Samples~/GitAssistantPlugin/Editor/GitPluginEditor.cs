@@ -14,18 +14,21 @@ namespace ImverGames.CustomBuildSettings.GitPlugin.Editor
 
         private bool available = false;
 
-        private BuildDataProvider buildDataProvider;
+        private MainBuildData mainBuildData;
+        private GitAssistant gitAssistant;
         
-        public async void InvokeSetupPlugin(BuildDataProvider buildDataProvider)
+        public async void InvokeSetupPlugin()
         {
-            this.buildDataProvider = buildDataProvider;
+            mainBuildData = DataBinder.GetData<MainBuildData>();
+            gitAssistant = DataBinder.GetData<GitAssistant>();
 
-            available = await buildDataProvider.GitAssistant.CheckGitAvailable();
+            available = await gitAssistant.CheckGitAvailable();
         }
 
         public async void InvokeOnFocusPlugin()
         {
-            available = await buildDataProvider.GitAssistant.CheckGitAvailable();
+            if(gitAssistant != null)
+                available = await gitAssistant.CheckGitAvailable();
         }
 
         public async void InvokeGUIPlugin()
@@ -41,7 +44,7 @@ namespace ImverGames.CustomBuildSettings.GitPlugin.Editor
 
             if (GUILayout.Button("Execute Command"))
             {
-                gitCommandOutput = await buildDataProvider.GitAssistant.ExecuteGitCommandAsync(gitCommand);
+                gitCommandOutput = await gitAssistant.ExecuteGitCommandAsync(gitCommand);
                 return;
             }
 

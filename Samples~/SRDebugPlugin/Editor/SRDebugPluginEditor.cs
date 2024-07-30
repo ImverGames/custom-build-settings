@@ -10,76 +10,90 @@ namespace ImverGames.CustomBuildSettings.SRDebuggerSettings.Editor
     [PluginOrder(3, "SRDebug/SRDebugPlugin")]
     public class SRDebugPluginEditor : IBuildPluginEditor
     {
-        private BuildDataProvider buildDataProvider;
+        private MainBuildData mainBuildData;
+        private GlobalDataStorage globalDataStorage;
         
-        private bool manualy = true;
+        private SRDebugPluginData srDebugPluginData;
         
         private BuildValue<bool> IsEnabled;
         private BuildValue<Settings.TriggerEnableModes> triggerEnableMode;
 
-        public void InvokeSetupPlugin(BuildDataProvider buildDataProvider)
+        public void InvokeSetupPlugin()
         {
-            this.buildDataProvider = buildDataProvider;
+            mainBuildData = DataBinder.GetData<MainBuildData>();
+            globalDataStorage = DataBinder.GetData<GlobalDataStorage>();
 
             IsEnabled = new BuildValue<bool>();
             triggerEnableMode = new BuildValue<Settings.TriggerEnableModes>();
 
-            IsEnabled.Value = Settings.Instance.IsEnabled;
-            triggerEnableMode.Value = Settings.Instance.EnableTrigger;
+            SaveLoadData();
             
             IsEnabled.OnValueChanged += IsEnabledOnOnValueChanged;
             triggerEnableMode.OnValueChanged += TriggerEnableModeOnOnValueChanged;
-            buildDataProvider.SelectedBuildType.OnValueChanged += SelectedBuildTypeOnOnValueChanged;
+            mainBuildData.SelectedBuildType.OnValueChanged += BuildTypeSettingsOnOnValueChanged;
+        }
+
+        private void BuildTypeSettingsOnOnValueChanged(EBuildType obj)
+        {
+            SaveLoadData();
+        }
+
+        private void SaveLoadData()
+        {
+            if (!globalDataStorage.TryGetPluginData<SRDebugPluginData>(GetType(), mainBuildData.SelectedBuildType.Value, out srDebugPluginData))
+                srDebugPluginData = globalDataStorage.RegisterOrUpdatePluginData(this.GetType(), mainBuildData.SelectedBuildType.Value,
+                    new SRDebugPluginData()
+                    {
+                        IsEnabled = Settings.Instance.IsEnabled,
+                        TriggerEnableMode = Settings.Instance.EnableTrigger
+                    });
+
+            IsEnabled.Value = srDebugPluginData.IsEnabled;
+            triggerEnableMode.Value = srDebugPluginData.TriggerEnableMode;
         }
 
         public void InvokeOnFocusPlugin()
         {
-            IsEnabled.Value = Settings.Instance.IsEnabled;
-            triggerEnableMode.Value = Settings.Instance.EnableTrigger;
-        }
-
-        private void SelectedBuildTypeOnOnValueChanged(EBuildType buildType)
-        {
-            if (buildType == EBuildType.RELEASE)
-                manualy = false;
+            
         }
 
         private void TriggerEnableModeOnOnValueChanged(Settings.TriggerEnableModes triggerEnableModes)
         {
+            if (globalDataStorage.TryGetPluginData<SRDebugPluginData>(GetType(), mainBuildData.SelectedBuildType.Value, out var debugPluginData))
+            {
+                debugPluginData.TriggerEnableMode = triggerEnableModes;
+                
+                globalDataStorage.RegisterOrUpdatePluginData(this.GetType(), mainBuildData.SelectedBuildType.Value, debugPluginData);
+            }
+
             Settings.Instance.EnableTrigger = triggerEnableModes;
         }
 
         private void IsEnabledOnOnValueChanged(bool value)
         {
+            if (globalDataStorage.TryGetPluginData<SRDebugPluginData>(GetType(), mainBuildData.SelectedBuildType.Value, out var debugPluginData))
+            {
+                debugPluginData.IsEnabled = value;
+                
+                globalDataStorage.RegisterOrUpdatePluginData(this.GetType(), mainBuildData.SelectedBuildType.Value, debugPluginData);
+            }
+            
             Settings.Instance.IsEnabled = value;
         }
 
         public void InvokeGUIPlugin()
         {
             GUILayout.Space(5);
-                
-            manualy = GUILayout.Toggle(manualy, "Manually change settings");
-                
-            GUILayout.Space(10);
 
-            if (manualy)
-            {
-                IsEnabled.Value = GUILayout.Toggle(IsEnabled.Value, "Enable SRDebugger");
+            IsEnabled.Value = EditorGUILayout.Toggle("Enable SRDebugger", IsEnabled.Value);
                     
-                GUILayout.Space(5);
+            GUILayout.Space(5);
                     
-                triggerEnableMode.Value =
-                    (Settings.TriggerEnableModes)EditorGUILayout.EnumPopup("Enable SRDebugger Trigger",
-                        triggerEnableMode.Value);
+            triggerEnableMode.Value =
+                (Settings.TriggerEnableModes)EditorGUILayout.EnumPopup("Enable SRDebugger Trigger",
+                    triggerEnableMode.Value);
 
-                return;
-            }
-            else
-            {
-                GUILayout.Label("Activity SRDebugger Depends on the type of build at \"Release\" it will be disabled and unavailable");
-            }
-
-            Settings.Instance.EnableTrigger = GetTriggerMode(buildDataProvider.SelectedBuildType.Value);
+            Settings.Instance.EnableTrigger = GetTriggerMode(mainBuildData.SelectedBuildType.Value);
         }
 
         private Settings.TriggerEnableModes GetTriggerMode(EBuildType buildType)
@@ -126,12 +140,9 @@ namespace ImverGames.CustomBuildSettings.SRDebuggerSettings.Editor
                 triggerEnableMode.OnValueChanged -= TriggerEnableModeOnOnValueChanged;
                 triggerEnableMode = null;
             }
-
-            if (buildDataProvider != null)
-            {
-                buildDataProvider.SelectedBuildType.OnValueChanged += SelectedBuildTypeOnOnValueChanged;
-                buildDataProvider = null;
-            }
+            
+            if(mainBuildData.SelectedBuildType != null)
+                mainBuildData.SelectedBuildType.OnValueChanged -= BuildTypeSettingsOnOnValueChanged;
         }
     }
 }
