@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -10,7 +10,7 @@ namespace ImverGames.CustomBuildSettings.Data
     public static class ResourceManager
     {
         private static string package = "com.imvergames.custombuildsettings";
-        private static string basePath = $"/Packages/{package}/Resources/Icons";
+        private static string basePath = $"Packages/{package}/Resources/Icons";
         private static Dictionary<string, string> iconPathsCache = new Dictionary<string, string>();
 
         /// <summary>
@@ -74,11 +74,12 @@ namespace ImverGames.CustomBuildSettings.Data
                 return cachedPath;
             }
 
-            var standardPath = $"{basePath}/{iconName}.png";
+            var standardPath = System.IO.Directory.GetCurrentDirectory() + $"/{basePath}/{iconName}.png";
+            var path = basePath + $"/{iconName}.png";
             if (System.IO.File.Exists(standardPath))
             {
-                iconPathsCache[iconName] = standardPath;
-                return standardPath;
+                iconPathsCache[iconName] = path;
+                return iconPathsCache[iconName];
             }
 
             var searchPattern = $"{iconName}.png";
